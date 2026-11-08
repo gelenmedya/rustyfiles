@@ -9,7 +9,7 @@ use windows::Win32::UI::Shell::Common::COMDLG_FILTERSPEC;
 use windows::Win32::UI::Shell::*;
 use windows::core::{GUID, HRESULT, HSTRING, IUnknown, Interface, w};
 
-fn main() -> windows::core::Result<()> {
+pub fn main() -> windows::core::Result<()> {
     let args: Vec<String> = std::env::args().collect();
     let mode = args.get(1).map(String::as_str).unwrap_or("open");
     let start = args.get(2).cloned().unwrap_or_else(|| std::env::temp_dir().to_string_lossy().into_owned());

@@ -64,6 +64,7 @@ use std::cell::Cell;
 use std::collections::HashSet;
 use std::fs::{self, File};
 use std::io::{self, BufReader, BufWriter, Read, Seek, SeekFrom, Write};
+#[cfg(windows)]
 use std::os::windows::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
@@ -1107,8 +1108,15 @@ struct Item {
     mtime: Option<SystemTime>,
 }
 
+/// Junctions / symlinks (not followed when collecting). `m` comes from `symlink_metadata`.
+#[cfg(windows)]
 fn is_reparse(m: &fs::Metadata) -> bool {
     m.file_attributes() & REPARSE_POINT != 0
+}
+
+#[cfg(not(windows))]
+fn is_reparse(m: &fs::Metadata) -> bool {
+    m.file_type().is_symlink()
 }
 
 fn collect(sources: &[PathBuf], skip: &[PathBuf]) -> Result<Vec<Item>> {

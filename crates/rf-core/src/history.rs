@@ -216,6 +216,7 @@ mod tests {
         assert_eq!(Location::from_shell_name(r"C:\Windows"), None);
     }
 
+    #[cfg(windows)] // Windows paths as input; TODO(linux, phase 2): a Unix-path version
     #[test]
     fn non_ascii_paths_do_not_panic() {
         let up = |s: &str| Location::Path(PathBuf::from(s)).parent();
@@ -233,6 +234,7 @@ mod tests {
         assert_eq!(redact_credentials(r"C:\a@b:c"), r"C:\a@b:c");
     }
 
+    #[cfg(windows)] // Windows paths as input; TODO(linux, phase 2): a Unix-path version
     #[test]
     fn unc_up() {
         let up = |s: &str| Location::Path(PathBuf::from(s)).parent();
@@ -256,6 +258,7 @@ mod tests {
         assert_eq!(h.back(), None);
     }
 
+    #[cfg(windows)] // Windows paths as input; TODO(linux, phase 2): a Unix-path version
     #[test]
     fn parent_of_root_is_home() {
         assert_eq!(Location::Path("C:\\".into()).parent(), Some(Location::Home));

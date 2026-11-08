@@ -16,3 +16,21 @@ jobs:
         run: cargo test --workspace
       - name: Release build
         run: cargo build --release -p rf-app -p rf-dialog
+
+  # Linux port (PORT_PLAN.md): build and test on Arch.
+  linux:
+    runs-on: ubuntu-latest
+    container: archlinux:latest
+    steps:
+      - name: System packages
+        run: >
+          pacman -Syu --noconfirm --needed base-devel git clang mold pkgconf rustup
+          wayland libxkbcommon libxcb vulkan-icd-loader fontconfig freetype2 alsa-lib dbus
+      - uses: actions/checkout@v4
+      - name: Rust toolchain
+        run: rustup default stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Build
+        run: cargo build --workspace
+      - name: Test
+        run: cargo test --workspace

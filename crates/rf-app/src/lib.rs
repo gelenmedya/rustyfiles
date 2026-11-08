@@ -26,6 +26,7 @@ mod installer;
 mod ops;
 mod picker;
 mod places;
+mod platform_ui;
 mod settings;
 mod select_box;
 mod settings_view;

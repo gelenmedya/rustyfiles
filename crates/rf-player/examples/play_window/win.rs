@@ -61,7 +61,7 @@ unsafe extern "system" fn proc(h: HWND, m: u32, w: WPARAM, l: LPARAM) -> LRESULT
     unsafe { DefWindowProcW(h, m, w, l) }
 }
 
-fn main() -> anyhow::Result<()> {
+pub fn main() -> anyhow::Result<()> {
     let path = std::env::args().nth(1).expect("video yolu");
     let sound = std::env::args().any(|a| a == "--sound");
     let shot_path = std::env::args().skip_while(|a| a != "--shot").nth(1);

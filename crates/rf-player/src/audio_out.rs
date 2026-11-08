@@ -83,8 +83,16 @@ impl AudioSink for NullSink {
     }
 }
 
+#[cfg(windows)]
 pub use wasapi::wasapi_sink;
 
+/// TODO(linux): real output (cpal → ALSA/PipeWire). Callers fall back to `NullSink` on error.
+#[cfg(not(windows))]
+pub fn wasapi_sink() -> anyhow::Result<Box<dyn AudioSink>> {
+    anyhow::bail!("no audio output on this platform yet")
+}
+
+#[cfg(windows)]
 mod wasapi {
     use super::AudioSink;
     use anyhow::Context;

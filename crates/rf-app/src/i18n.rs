@@ -189,7 +189,23 @@ fn match_tag(tag: &str) -> Lang {
         .map_or(Lang::En, |i| Lang::Other(i as u16))
 }
 
+/// The desktop language's best translation (English when there is none): the first of
+/// `LANGUAGE` ("de:en"), else `LC_ALL` / `LC_MESSAGES` / `LANG` ("de_DE.UTF-8" → "de-DE").
+#[cfg(not(windows))]
+fn system_lang() -> Lang {
+    let first = std::env::var("LANGUAGE").ok().and_then(|l| l.split(':').next().map(str::to_string)).filter(|l| !l.is_empty());
+    let tag = first
+        .or_else(|| ["LC_ALL", "LC_MESSAGES", "LANG"].iter().find_map(|v| std::env::var(v).ok().filter(|s| !s.is_empty())))
+        .unwrap_or_default();
+    let tag = tag.split(['.', '@']).next().unwrap_or("").replace('_', "-");
+    if tag.is_empty() || tag == "C" || tag == "POSIX" {
+        return Lang::En;
+    }
+    match_tag(&tag)
+}
+
 /// The Windows UI language's best translation (English when there is none).
+#[cfg(windows)]
 fn system_lang() -> Lang {
     use windows::Win32::Globalization::{GetUserDefaultUILanguage, LCIDToLocaleName};
     let mut buf = [0u16; 85];

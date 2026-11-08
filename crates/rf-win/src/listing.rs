@@ -116,6 +116,23 @@ pub fn list_dir(
     result.map(|_| total)
 }
 
+/// One entry for a path outside a listing (tag views). `follow_links`: describe a link's
+/// target instead of the link.
+pub fn entry_for(path: &Path, follow_links: bool) -> Option<Entry> {
+    use std::os::windows::fs::MetadataExt;
+    let m = if follow_links { std::fs::metadata(path) } else { std::fs::symlink_metadata(path) }.ok()?;
+    let name = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+    let kind = if m.is_dir() { EntryKind::Dir } else { EntryKind::File };
+    Some(Entry::new(
+        &name,
+        kind,
+        if m.is_dir() { 0 } else { m.file_size() },
+        filetime_to_unix_ms(m.last_write_time()),
+        filetime_to_unix_ms(m.creation_time()),
+        m.file_attributes(),
+    ))
+}
+
 pub(crate) fn to_entry(d: &WIN32_FIND_DATAW) -> Option<Entry> {
     let name = from_wide(&d.cFileName);
     if name == "." || name == ".." {

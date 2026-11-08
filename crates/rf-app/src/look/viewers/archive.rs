@@ -76,7 +76,7 @@ fn open_in_rustyfiles(path: PathBuf) {
         if rf_win::single_instance::send_to("rustyfiles", &msg) {
             return;
         }
-        let exe = std::env::current_exe().map(|e| e.with_file_name("rustyfiles.exe"));
+        let exe = std::env::current_exe().map(|e| e.with_file_name(format!("rustyfiles{}", std::env::consts::EXE_SUFFIX)));
         match exe {
             Ok(exe) if exe.exists() => {
                 if let Err(e) = std::process::Command::new(exe).arg(arg).spawn() {
@@ -374,6 +374,7 @@ impl Render for ArchiveView {
 mod tests {
     use super::{build_tree, rows, rustyfiles_launch};
 
+    #[cfg(windows)] // Windows paths as input; TODO(linux, phase 2): a Unix-path version
     #[test]
     fn archives_open_in_rustyfiles_as_folder_or_selected() {
         let zip = std::path::Path::new(r"C:\a b\x.zip");

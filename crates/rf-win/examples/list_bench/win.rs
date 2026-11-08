@@ -96,7 +96,7 @@ fn info_walk(dir: &Path, t: &mut T, buf: &mut Vec<u64>) {
     }
 }
 
-fn main() {
+pub fn main() {
     let dir = PathBuf::from(std::env::args().nth(1).expect("dir"));
     for round in 0..2 {
         let t0 = Instant::now();

@@ -11,8 +11,6 @@ use gpui_kit::*;
 use rf_core::{Location, SortDir, SortKey};
 use rf_win::ctxmenu::{MenuOutcome, ShellItem, ShellTarget};
 use rf_win::fileops::Transfer;
-use windows::Win32::Foundation::POINT;
-use windows::Win32::UI::WindowsAndMessaging::GetCursorPos;
 
 use crate::fluent_menu::{self, Item, Menu, MenuIcon, Pending, Quick, Sub};
 use crate::folder_view::{FolderEvent, FolderView, GroupBy, ViewMode};
@@ -60,20 +58,14 @@ fn icon(l: L) -> MenuIcon {
 }
 
 fn cursor() -> (i32, i32) {
-    let mut pt = POINT::default();
-    unsafe {
-        let _ = GetCursorPos(&mut pt);
-    }
-    (pt.x, pt.y)
+    rf_win::input::cursor_pos()
 }
 
 impl FolderView {
     /// Opens our context menu for the selection (or the folder background) at the mouse.
     pub fn show_context_menu(&mut self, background: bool, window: &mut Window, cx: &mut Context<Self>) {
-        let shift = unsafe {
-            use windows::Win32::UI::Input::KeyboardAndMouse::{GetKeyState, VK_SHIFT};
-            GetKeyState(VK_SHIFT.0 as i32) < 0
-        };
+        // (Linux has no native shell menu: our own menu always)
+        let shift = cfg!(windows) && rf_win::input::shift_down();
         if shift {
             // power users: the full classic Explorer menu (extended verbs)
             self.show_native_menu(background, cx);

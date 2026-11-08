@@ -68,6 +68,15 @@ mod tests {
         assert_eq!(split("abc"), None);
     }
 
+    #[cfg(not(windows))]
+    #[test]
+    fn completes_unix_dirs() {
+        let r = complete_dirs("/us", 10, false);
+        assert!(r.iter().any(|p| p == Path::new("/usr")), "{r:?}");
+        assert!(complete_dirs("relative/x", 5, false).is_empty());
+    }
+
+    #[cfg(windows)]
     #[test]
     fn completes_windows_dirs() {
         let r = complete_dirs(r"C:\Windows\Sys", 10, false);

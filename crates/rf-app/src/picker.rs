@@ -439,6 +439,7 @@ mod tests {
     use super::{names_text, parse_names, resolve};
     use std::path::{Path, PathBuf};
 
+    #[cfg(windows)] // Windows paths as input; TODO(linux, phase 2): a Unix-path version
     #[test]
     fn names_round_trip() {
         let ps = vec![PathBuf::from(r"C:\a\bir.txt"), PathBuf::from(r"C:\a\iki dosya.txt")];

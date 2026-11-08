@@ -405,10 +405,10 @@ impl Workspace {
 
         // Repaint the status-bar renderer badge when the hybrid renderer switches devices.
         cx.spawn(async move |this, cx| {
-            let mut last = (gpui_windows::hybrid::switch_count(), gpui_windows::hybrid::mode());
+            let mut last = (crate::platform_ui::hybrid::switch_count(), crate::platform_ui::hybrid::mode());
             loop {
                 cx.background_executor().timer(std::time::Duration::from_millis(800)).await;
-                let now = (gpui_windows::hybrid::switch_count(), gpui_windows::hybrid::mode());
+                let now = (crate::platform_ui::hybrid::switch_count(), crate::platform_ui::hybrid::mode());
                 if now != last {
                     last = now;
                     if this.update(cx, |_, cx| cx.notify()).is_err() {
@@ -1666,18 +1666,13 @@ impl Workspace {
     /// plus open in new tab/window and pin/unpin.
     fn sidebar_menu(&mut self, path: PathBuf, window: &mut Window, cx: &mut Context<Self>) {
         use crate::fluent_menu::{Item, Menu, MenuIcon, Sub};
-        let shift = unsafe {
-            windows::Win32::UI::Input::KeyboardAndMouse::GetKeyState(windows::Win32::UI::Input::KeyboardAndMouse::VK_SHIFT.0 as i32) < 0
-        };
+        // (Linux has no native shell menu: our own menu always)
+        let shift = cfg!(windows) && rf_win::input::shift_down();
         if shift {
             // the classic Explorer menu, extended verbs included
             let p2 = path.clone();
             rf_win::sta::run(move |owner| {
-                let mut pt = windows::Win32::Foundation::POINT::default();
-                unsafe {
-                    let _ = windows::Win32::UI::WindowsAndMessaging::GetCursorPos(&mut pt);
-                }
-                if let Err(e) = rf_win::ctxmenu::show_for_one(owner, &p2, (pt.x, pt.y), true, &[]) {
+                if let Err(e) = rf_win::ctxmenu::show_for_one(owner, &p2, rf_win::input::cursor_pos(), true, &[]) {
                     log::warn!("sidebar menu: {e:#}");
                 }
             });
@@ -1723,11 +1718,7 @@ impl Workspace {
             })),
             Item::action(t!("Özellikler"), MenuIcon::Lucide(L::Wrench), with(|_, p, _, _| {
                 rf_win::sta::run(move |owner| {
-                    let mut pt = windows::Win32::Foundation::POINT::default();
-                    unsafe {
-                        let _ = windows::Win32::UI::WindowsAndMessaging::GetCursorPos(&mut pt);
-                    }
-                    if let Err(e) = rf_win::ctxmenu::invoke_verb(owner, &rf_win::ctxmenu::ShellTarget::One(p), "properties", (pt.x, pt.y)) {
+                    if let Err(e) = rf_win::ctxmenu::invoke_verb(owner, &rf_win::ctxmenu::ShellTarget::One(p), "properties", rf_win::input::cursor_pos()) {
                         log::warn!("properties: {e:#}");
                     }
                 });
@@ -2698,11 +2689,14 @@ fn tooltip_text(id: &str) -> &'static str {
 /// Opens `dir` in the user's editor (`ide` path, else VS Code's `code` launcher).
 pub fn open_in_ide(dir: PathBuf, ide: String) {
     std::thread::spawn(move || {
-        use std::os::windows::process::CommandExt;
-        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        use rf_win::process::{CREATE_NO_WINDOW, NoWindow as _};
         let r = if ide.is_empty() {
-            // `code` is a .cmd launcher: run it through cmd without a console window
-            std::process::Command::new("cmd").args(["/c", "code", "."]).current_dir(&dir).creation_flags(CREATE_NO_WINDOW).spawn()
+            // `code` is a .cmd launcher on Windows: run it through cmd without a console window
+            if cfg!(windows) {
+                std::process::Command::new("cmd").args(["/c", "code", "."]).current_dir(&dir).no_window(CREATE_NO_WINDOW).spawn()
+            } else {
+                std::process::Command::new("code").arg(".").current_dir(&dir).spawn()
+            }
         } else {
             std::process::Command::new(&ide).arg(&dir).spawn()
         };
@@ -2717,17 +2711,14 @@ fn drop_files(paths: &ExternalPaths, dest: PathBuf, cx: &mut App) {
     if sources.is_empty() || rf_win::dnd::is_invalid_drop(&sources, &dest) {
         return;
     }
-    let (ctrl, shift) = unsafe {
-        use windows::Win32::UI::Input::KeyboardAndMouse::{GetKeyState, VK_CONTROL, VK_SHIFT};
-        (GetKeyState(VK_CONTROL.0 as i32) < 0, GetKeyState(VK_SHIFT.0 as i32) < 0)
-    };
+    let (ctrl, shift) = (rf_win::input::ctrl_down(), rf_win::input::shift_down());
     let kind = rf_win::dnd::default_transfer(&sources, &dest, ctrl, shift);
     crate::status_center::transfer(cx, kind, sources, dest);
 }
 
 /// Shows which device draws the window (hybrid renderer) and cycles Auto → GPU → CPU on click.
 fn render_backend_badge(p: &Palette) -> impl IntoElement + use<> {
-    use gpui_windows::hybrid::{self, RendererMode};
+    use crate::platform_ui::hybrid::{self, RendererMode};
     let mode = hybrid::mode();
     let backend = hybrid::current_backend_label();
     let mode_label = match mode {
@@ -3284,6 +3275,7 @@ mod tests {
     use rf_core::Location;
     use std::path::{Path, PathBuf};
 
+    #[cfg(windows)] // Windows paths as input; TODO(linux, phase 2): a Unix-path version
     #[test]
     fn crumbs() {
         let c = breadcrumbs(Path::new(r"C:\Users\demo"));
@@ -3303,6 +3295,7 @@ mod launch_tests {
     use rf_core::Location;
     use std::path::PathBuf;
 
+    #[cfg(windows)] // Windows paths as input; TODO(linux, phase 2): a Unix-path version
     #[test]
     fn select_messages() {
         let (loc, sel) = parse_launch(&format!(r"{SELECT_PREFIX}C:\Klasör\rapor ü.txt"));

@@ -1,5 +1,6 @@
 //! Hızlı Bakış resim çözücü: image paketi → resvg (SVG) → WIC (HEIC, AVIF, JXL, RAW…) → RAW'daki
 //! gömülü JPEG → PSD birleşik görüntü → kabuk küçük resmi.
+//! (Shared by every platform; only the WIC step is Windows-only.)
 
 use std::io::Cursor;
 use std::path::Path;
@@ -163,6 +164,7 @@ fn svg(bytes: &[u8], max_side: u32) -> anyhow::Result<Decoded> {
 }
 
 /// Windows Imaging Component: kurulu codec'ler (HEIC, AVIF, JXL, JPEG XR, kamera RAW…).
+#[cfg(windows)]
 fn wic(path: &Path, max_side: u32) -> anyhow::Result<Decoded> {
     use windows::Win32::Foundation::GENERIC_READ;
     use windows::Win32::Graphics::Imaging::*;
@@ -236,6 +238,11 @@ pub fn dimensions(path: &Path) -> Option<(u32, u32)> {
             }
         }
     }
+    wic_dimensions(path)
+}
+
+#[cfg(windows)]
+fn wic_dimensions(path: &Path) -> Option<(u32, u32)> {
     use windows::Win32::Foundation::GENERIC_READ;
     use windows::Win32::Graphics::Imaging::*;
     use windows::Win32::System::Com::{CLSCTX_INPROC_SERVER, CoCreateInstance};
@@ -252,6 +259,12 @@ pub fn dimensions(path: &Path) -> Option<(u32, u32)> {
     }
 }
 
+/// TODO(linux): RAW / HEIC / AVIF / JXL headers (libheif, jxl-oxide…).
+#[cfg(not(windows))]
+fn wic_dimensions(_path: &Path) -> Option<(u32, u32)> {
+    None
+}
+
 /// Resmi tam çözünürlükte (en uzun kenar en çok `max_side`) çözer; sırayla dener.
 pub fn decode_full(path: &Path, max_side: u32) -> anyhow::Result<Decoded> {
     let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("").to_ascii_lowercase();
@@ -265,6 +278,7 @@ pub fn decode_full(path: &Path, max_side: u32) -> anyhow::Result<Decoded> {
             return Ok(d);
         }
     }
+    #[cfg(windows)]
     if let Ok(d) = wic(path, max_side) {
         return Ok(d);
     }
@@ -278,9 +292,21 @@ pub fn decode_full(path: &Path, max_side: u32) -> anyhow::Result<Decoded> {
             return Ok(d);
         }
     }
+    shell_thumbnail(path, max_side)
+}
+
+/// Last resort: whatever thumbnail the shell can make.
+#[cfg(windows)]
+fn shell_thumbnail(path: &Path, max_side: u32) -> anyhow::Result<Decoded> {
     let t = crate::thumbs::get_image(path, max_side.min(1024), crate::thumbs::Kind::Thumbnail)?;
     let (width, height) = (t.width, t.height);
     Ok(Decoded { frames: vec![(t, 0)], orientation: 1, exif: Vec::new(), width, height })
+}
+
+// No shell thumbnailer to fall back on (and Linux thumbnails come from this decoder).
+#[cfg(not(windows))]
+fn shell_thumbnail(path: &Path, _max_side: u32) -> anyhow::Result<Decoded> {
+    anyhow::bail!("cannot decode {}", path.display())
 }
 
 #[cfg(test)]

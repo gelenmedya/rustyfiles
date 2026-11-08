@@ -96,10 +96,12 @@ fn load_cloud_and_wsl() -> Vec<Pinned> {
             }
         }
     }
+    #[cfg(windows)]
     for letter in ['G', 'H'] {
         add("Google Drive".into(), PathBuf::from(format!("{letter}:\\My Drive")), L::Cloud);
     }
     // WSL distributions registered for this user
+    #[cfg(windows)]
     if let Ok(lxss) = windows_registry::CURRENT_USER.open(r"Software\Microsoft\Windows\CurrentVersion\Lxss") {
         if let Ok(keys) = lxss.keys() {
             for k in keys {

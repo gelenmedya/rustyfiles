@@ -1,4 +1,4 @@
-//! Directory change notifications (ReadDirectoryChangesW via `notify`), debounced.
+//! Directory change notifications (ReadDirectoryChangesW / inotify via `notify`), debounced.
 
 use std::path::Path;
 use std::sync::Arc;
@@ -23,6 +23,7 @@ pub fn watch_dir(dir: &Path, debounce: Duration, on_change: impl Fn() + Send + S
     })?;
     // notify opens the directory without the `\\?\` prefix: past MAX_PATH that fails and the
     // view would silently stop updating. Give it the long form there.
+    #[cfg(windows)]
     let target = if dir.as_os_str().len() >= 240 {
         use std::os::windows::ffi::OsStringExt;
         let mut long = crate::wide::long_path(dir);
@@ -31,6 +32,9 @@ pub fn watch_dir(dir: &Path, debounce: Duration, on_change: impl Fn() + Send + S
     } else {
         dir.to_path_buf()
     };
+    // inotify has no such limit
+    #[cfg(not(windows))]
+    let target = dir.to_path_buf();
     w.watch(&target, RecursiveMode::NonRecursive)?;
     let on_change = Arc::new(on_change);
     std::thread::Builder::new().name("rf-watch".into()).spawn(move || {

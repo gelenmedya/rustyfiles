@@ -903,21 +903,11 @@ impl FolderView {
             let generation = self.generation;
             let (tx, mut rx) = mpsc::unbounded::<Msg>();
             std::thread::spawn(move || {
-                use std::os::windows::fs::MetadataExt;
                 let mut es = Vec::new();
                 let mut ps: Vec<Arc<std::path::Path>> = Vec::new();
                 for p in paths {
-                    let Ok(m) = std::fs::symlink_metadata(&p) else { continue };
-                    let name = p.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
-                    let kind = if m.is_dir() { rf_core::EntryKind::Dir } else { rf_core::EntryKind::File };
-                    es.push(Entry::new(
-                        &name,
-                        kind,
-                        m.file_size(),
-                        format::filetime_to_unix_ms(m.last_write_time()),
-                        format::filetime_to_unix_ms(m.creation_time()),
-                        m.file_attributes(),
-                    ));
+                    let Some(e) = rf_win::listing::entry_for(&p, false) else { continue };
+                    es.push(e);
                     ps.push(p.parent().unwrap_or(&p).into());
                 }
                 let n = es.len();
@@ -1000,14 +990,8 @@ impl FolderView {
                         let mut es = Vec::new();
                         let mut ps: Vec<Arc<std::path::Path>> = Vec::new();
                         for p in paths {
-                            use std::os::windows::fs::MetadataExt;
-                            let Ok(m) = std::fs::metadata(&p) else { continue };
-                            let ms = |t: std::io::Result<std::time::SystemTime>| {
-                                t.ok().and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map_or(0, |d| d.as_millis() as i64)
-                            };
-                            let kind = if m.is_dir() { rf_core::EntryKind::Dir } else { rf_core::EntryKind::File };
-                            let name = p.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
-                            es.push(Entry::new(&name, kind, if m.is_dir() { 0 } else { m.len() }, ms(m.modified()), ms(m.created()), m.file_attributes()));
+                            let Some(e) = rf_win::listing::entry_for(&p, true) else { continue };
+                            es.push(e);
                             ps.push(p.parent().unwrap_or(&p).into());
                         }
                         let n = es.len();
@@ -1768,7 +1752,7 @@ impl FolderView {
         self.slow_click_serial += 1;
         let serial = self.slow_click_serial;
         self.slow_click = Some((ei, serial));
-        let wait = std::time::Duration::from_millis(unsafe { windows::Win32::UI::Input::KeyboardAndMouse::GetDoubleClickTime() } as u64);
+        let wait = rf_win::input::double_click_time();
         cx.spawn(async move |this, cx| {
             cx.background_executor().timer(wait).await;
             let _ = this.update(cx, |v, cx| {
@@ -2878,9 +2862,9 @@ impl FolderView {
                         if let Some(dir) = this.current_dir() {
                             let paths: Vec<PathBuf> = ev.drag(cx).paths().to_vec();
                             let t = rf_win::dnd::default_transfer(&paths, &dir, false, false);
-                            gpui_windows::dnd_hint::set(match t {
-                                rf_win::fileops::Transfer::Move => gpui_windows::dnd_hint::MOVE,
-                                rf_win::fileops::Transfer::Copy => gpui_windows::dnd_hint::COPY,
+                            crate::platform_ui::dnd_hint::set(match t {
+                                rf_win::fileops::Transfer::Move => crate::platform_ui::dnd_hint::MOVE,
+                                rf_win::fileops::Transfer::Copy => crate::platform_ui::dnd_hint::COPY,
                             });
                         }
                     }))

@@ -177,7 +177,7 @@ fn open(key: SharedString, field: Bounds<Pixels>, choices: Vec<Choice>, window: 
     match opened {
         Ok(h) => {
             // the app window keeps its active look while the popup has the keyboard
-            gpui_windows::KEEP_ACTIVE_LOOK.store(true, std::sync::atomic::Ordering::Relaxed);
+            crate::platform_ui::KEEP_ACTIVE_LOOK.store(true, std::sync::atomic::Ordering::Relaxed);
             cx.default_global::<Host>().open = Some(h.into());
         }
         Err(e) => log::warn!("select popup: {e:#}"),
@@ -187,7 +187,7 @@ fn open(key: SharedString, field: Bounds<Pixels>, choices: Vec<Choice>, window: 
 /// Closes the open popup (if any), after the current update.
 fn close_open(cx: &mut App) {
     let Some(w) = cx.default_global::<Host>().open.take() else { return };
-    gpui_windows::KEEP_ACTIVE_LOOK.store(false, std::sync::atomic::Ordering::Relaxed);
+    crate::platform_ui::KEEP_ACTIVE_LOOK.store(false, std::sync::atomic::Ordering::Relaxed);
     cx.defer(move |cx| {
         let _ = w.update(cx, |_, window, _| window.remove_window());
     });

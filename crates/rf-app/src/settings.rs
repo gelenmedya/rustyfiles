@@ -540,7 +540,7 @@ impl Settings {
         rf_core::format::set_decimal_sizes(self.decimal_sizes);
         SOLID.store(self.backdrop == BackdropPref::Solid, Ordering::Relaxed);
         ANIM.store(self.animations as u8, Ordering::Relaxed);
-        gpui_windows::SMOOTH_SCROLL.store(self.smooth_scroll, Ordering::Relaxed);
+        crate::platform_ui::SMOOTH_SCROLL.store(self.smooth_scroll, Ordering::Relaxed);
         THEME.store(
             match self.theme {
                 ThemePref::System => 0,
@@ -551,7 +551,7 @@ impl Settings {
         );
         // An explicit RUSTYFILES_RENDERER env var wins (debugging).
         if std::env::var_os("RUSTYFILES_RENDERER").is_none() {
-            use gpui_windows::hybrid::{RendererMode, set_mode};
+            use crate::platform_ui::hybrid::{RendererMode, set_mode};
             set_mode(match self.renderer {
                 RendererPref::Auto => RendererMode::Auto,
                 RendererPref::Gpu => RendererMode::Gpu,

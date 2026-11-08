@@ -23,7 +23,12 @@ hadris-io.workspace = true
 hadris-udf.workspace = true
 hadris-storage.workspace = true
 
+[target.'cfg(windows)'.dependencies]
 windows = { workspace = true, features = ["Win32_System_Time", "Win32_Globalization", "Win32_System_Registry", "Win32_Foundation"] }
+
+[target.'cfg(not(windows))'.dependencies]
+# DOS local time <-> UTC for ZIP entries (Windows uses its own time-zone API)
+chrono.workspace = true
 
 [dev-dependencies]
 crc32fast.workspace = true

@@ -3,7 +3,7 @@ use windows::Win32::System::Com::{COINIT_APARTMENTTHREADED, CoInitializeEx, CoTa
 use windows::Win32::UI::Shell::{ASSOC_FILTER_NONE, ASSOC_FILTER_RECOMMENDED, IAssocHandler, SHAssocEnumHandlers};
 use windows::core::HSTRING;
 
-fn main() -> windows::core::Result<()> {
+pub fn main() -> windows::core::Result<()> {
     let ext = std::env::args().nth(1).unwrap_or_else(|| ".7z".into());
     unsafe {
         let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);

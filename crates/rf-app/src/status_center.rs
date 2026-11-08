@@ -782,19 +782,19 @@ pub fn sync_popup(ops: &Entity<Ops>, cx: &mut App) {
         (true, None) if !in_window => {
             let Some(owner) = owner else { return };
             // the app window keeps its active look (Mica, caption) while the flyout has focus
-            gpui_windows::KEEP_ACTIVE_LOOK.store(true, std::sync::atomic::Ordering::Relaxed);
+            crate::platform_ui::KEEP_ACTIVE_LOOK.store(true, std::sync::atomic::Ordering::Relaxed);
             let opened = if std::env::var_os("RF_INWINDOW_MENU").is_some() { None } else { open_popup(ops, owner, cx) };
             match opened {
                 Some(h) => cx.set_global(ScPopup(Some(h))),
                 None => ops.update(cx, |o, cx| {
-                    gpui_windows::KEEP_ACTIVE_LOOK.store(false, std::sync::atomic::Ordering::Relaxed);
+                    crate::platform_ui::KEEP_ACTIVE_LOOK.store(false, std::sync::atomic::Ordering::Relaxed);
                     o.in_window = true;
                     cx.notify();
                 }),
             }
         }
         (false, Some(h)) => {
-            gpui_windows::KEEP_ACTIVE_LOOK.store(false, std::sync::atomic::Ordering::Relaxed);
+            crate::platform_ui::KEEP_ACTIVE_LOOK.store(false, std::sync::atomic::Ordering::Relaxed);
             cx.set_global(ScPopup(None));
             let _ = h.update(cx, |_, w, _| w.remove_window());
         }

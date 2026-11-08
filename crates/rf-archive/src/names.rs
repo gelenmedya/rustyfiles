@@ -5,12 +5,15 @@
 use std::borrow::Cow;
 use std::sync::OnceLock;
 
+#[cfg(windows)]
 use windows::Win32::Globalization::{GetLocaleInfoEx, LOCALE_IDEFAULTCODEPAGE, MULTI_BYTE_TO_WIDE_CHAR_FLAGS, MultiByteToWideChar};
+#[cfg(windows)]
 use windows::core::PCWSTR;
 
 /// The user locale's traditional OEM code page (857 for tr-TR, 437 for en-US). Deliberately
 /// not `GetOEMCP()`: with "Use Unicode UTF-8 for worldwide language support" enabled that is
 /// 65001, but old archives were still written in the legacy page.
+#[cfg(windows)]
 pub fn legacy_oem_codepage() -> u32 {
     static CP: OnceLock<u32> = OnceLock::new();
     *CP.get_or_init(|| {
@@ -21,6 +24,17 @@ pub fn legacy_oem_codepage() -> u32 {
     })
 }
 
+/// The OEM code page a Windows PC with this user's language would use (from `LANG`/`LC_ALL`).
+#[cfg(not(windows))]
+pub fn legacy_oem_codepage() -> u32 {
+    static CP: OnceLock<u32> = OnceLock::new();
+    *CP.get_or_init(|| {
+        let lang = ["LC_ALL", "LC_CTYPE", "LANG"].iter().find_map(|v| std::env::var(v).ok().filter(|s| !s.is_empty())).unwrap_or_default();
+        if lang.starts_with("tr") { 857 } else { 437 }
+    })
+}
+
+#[cfg(windows)]
 fn decode_codepage(raw: &[u8], cp: u32) -> Option<String> {
     let n = unsafe { MultiByteToWideChar(cp, MULTI_BYTE_TO_WIDE_CHAR_FLAGS(0), raw, None) };
     if n <= 0 {
@@ -29,6 +43,13 @@ fn decode_codepage(raw: &[u8], cp: u32) -> Option<String> {
     let mut out = vec![0u16; n as usize];
     let n = unsafe { MultiByteToWideChar(cp, MULTI_BYTE_TO_WIDE_CHAR_FLAGS(0), raw, Some(&mut out)) };
     (n > 0).then(|| String::from_utf16_lossy(&out[..n as usize]))
+}
+
+/// TODO(linux): decode OEM code pages (CP857, CP850…), e.g. with the `oem_cp` crate. Until then
+/// names fall back to the zip crate's CP437 decoding.
+#[cfg(not(windows))]
+fn decode_codepage(_raw: &[u8], _cp: u32) -> Option<String> {
+    None
 }
 
 /// Best name for an entry: valid UTF-8 bytes are UTF-8 (flagged or not); anything else is the
@@ -46,7 +67,7 @@ pub fn entry_name<'a>(raw: &[u8], fallback: Cow<'a, str>) -> Cow<'a, str> {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, windows))]
 mod tests {
     use super::*;
 

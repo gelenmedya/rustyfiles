@@ -72,7 +72,7 @@ fn manual(a: &Path, b: &Path) {
     dst.set_times(times).unwrap();
 }
 
-fn main() {
+pub fn main() {
     let mut args = std::env::args().skip(1);
     let work = PathBuf::from(args.next().expect("work dir"));
     let threads: usize = args.next().and_then(|s| s.parse().ok()).unwrap_or(16);

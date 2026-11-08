@@ -1,3 +1,6 @@
+// The D3D11 offscreen renderer is Windows-only.
+#![cfg(windows)]
+
 use rf_player::{Frame, render_offscreen};
 
 fn px(rgba: &[u8], w: u32, x: u32, y: u32) -> (u8, u8, u8) {

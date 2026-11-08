@@ -41,6 +41,8 @@ fn can_open_by_extension() {
 }
 
 /// 4 GB'lık seyrek bir dosyanın başında h264.mp4 var; açma 1 s içinde döner ve bellek 200 MB'ı aşmaz.
+/// (Windows: sparse file and memory counters via Win32. TODO(linux): same test with set_len + /proc/self/status.)
+#[cfg(windows)]
 #[test]
 fn huge_file_is_not_read_whole() {
     use std::io::Write;

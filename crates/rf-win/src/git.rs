@@ -4,13 +4,12 @@
 //! (ignore rules, submodules, sparse checkout, ...). Blocking: call off the UI thread.
 
 use std::collections::HashMap;
-use std::os::windows::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
 use anyhow::{Result, bail};
 
-const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+use crate::process::{CREATE_NO_WINDOW, NoWindow as _};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum FileState {
@@ -113,7 +112,7 @@ fn git_cmd(root: &Path) -> Command {
         .env("GIT_OPTIONAL_LOCKS", "0")
         .env("GIT_TERMINAL_PROMPT", "0")
         .stdin(Stdio::null())
-        .creation_flags(CREATE_NO_WINDOW);
+        .no_window(CREATE_NO_WINDOW);
     c
 }
 
@@ -739,7 +738,7 @@ pub fn last_commits_of_children(root: &Path, dir: &Path, names: &[String], max_c
         .stdout(Stdio::piped())
         .stderr(Stdio::null())
         // a long history is background work: below-normal priority, no console window
-        .creation_flags(CREATE_NO_WINDOW | 0x0000_4000);
+        .no_window(CREATE_NO_WINDOW | 0x0000_4000);
     let Ok(mut child) = c.spawn() else { return out };
     let Some(stdout) = child.stdout.take() else { return out };
     let mut current: Option<Commit> = None;
@@ -854,7 +853,7 @@ u UU N... 100644 100644 100644 100644 a b c conflict.txt\0\
             .args(args)
             .current_dir(dir)
             .stdin(Stdio::null())
-            .creation_flags(CREATE_NO_WINDOW)
+            .no_window(CREATE_NO_WINDOW)
             .output()
             .map(|o| o.status.success())
             .unwrap_or(false)
@@ -939,7 +938,7 @@ u UU N... 100644 100644 100644 100644 a b c conflict.txt\0\
     // ---- branches / checkout / network ----
 
     fn git_out(dir: &Path, args: &[&str]) -> String {
-        let o = Command::new("git").args(args).current_dir(dir).stdin(Stdio::null()).creation_flags(CREATE_NO_WINDOW).output().unwrap();
+        let o = Command::new("git").args(args).current_dir(dir).stdin(Stdio::null()).no_window(CREATE_NO_WINDOW).output().unwrap();
         String::from_utf8_lossy(&o.stdout).trim().to_string()
     }
 

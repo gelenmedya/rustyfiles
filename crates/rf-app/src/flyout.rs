@@ -37,7 +37,7 @@ pub fn is_open(cx: &App) -> bool {
 /// Closes the open flyout, if any.
 pub fn close(cx: &mut App) {
     if let Some(w) = host(cx).window.take() {
-        gpui_windows::KEEP_ACTIVE_LOOK.store(false, std::sync::atomic::Ordering::Relaxed);
+        crate::platform_ui::KEEP_ACTIVE_LOOK.store(false, std::sync::atomic::Ordering::Relaxed);
         let _ = w.update(cx, |_, window, _| window.remove_window());
     }
 }
@@ -72,7 +72,7 @@ pub fn toggle(key: &'static str, pos: Point<Pixels>, width: f32, body: Body, own
         ..Default::default()
     };
     // the app window keeps its active look (Mica, caption) while the flyout has focus
-    gpui_windows::KEEP_ACTIVE_LOOK.store(true, std::sync::atomic::Ordering::Relaxed);
+    crate::platform_ui::KEEP_ACTIVE_LOOK.store(true, std::sync::atomic::Ordering::Relaxed);
     let r = cx.open_window(opts, move |w, cx| {
         use raw_window_handle::{HasWindowHandle, RawWindowHandle};
         if let Ok(h) = w.window_handle() {
@@ -89,7 +89,7 @@ pub fn toggle(key: &'static str, pos: Point<Pixels>, width: f32, body: Body, own
             h.key = key;
         }
         Err(e) => {
-            gpui_windows::KEEP_ACTIVE_LOOK.store(false, std::sync::atomic::Ordering::Relaxed);
+            crate::platform_ui::KEEP_ACTIVE_LOOK.store(false, std::sync::atomic::Ordering::Relaxed);
             log::warn!("flyout: {e:#}")
         }
     }
