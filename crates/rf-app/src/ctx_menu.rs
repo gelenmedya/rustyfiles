@@ -96,13 +96,23 @@ impl FolderView {
 
         // Shell items in the background: QueryContextMenu can take a second with slow extensions.
         let target = if background { ShellTarget::Background(dir.clone()) } else { ShellTarget::Items(items.clone()) };
+        // The user's own programs for the first selected file's type (Settings > File types): the first rows of "Open with". Their
+        // icons are read on the worker, with the shell's items: never on the UI thread.
+        let own: Vec<String> = if background { Vec::new() } else { items.first().map(|f| rf_win::openrules::programs_for(f)).unwrap_or_default() };
         let (tx, rx) = oneshot::channel();
         rf_win::sta::run(move |owner| {
-            let _ = tx.send(rf_win::ctxmenu::build(owner, &target, false).map_err(|e| format!("{e:#}")));
+            let own: Vec<OwnProgram> = own
+                .into_iter()
+                .map(|program| {
+                    let icon = rf_win::thumbs::get_image(std::path::Path::new(&program), 32, rf_win::thumbs::Kind::Icon).ok();
+                    (program, icon)
+                })
+                .collect();
+            let _ = tx.send((rf_win::ctxmenu::build(owner, &target, false).map_err(|e| format!("{e:#}")), own));
         });
         let menu_weak = menu_view.downgrade();
         cx.spawn(async move |_, cx| {
-            let result = rx.await.unwrap_or_else(|_| Err("cancelled".into()));
+            let (result, own) = rx.await.unwrap_or_else(|_| (Err("cancelled".into()), Vec::new()));
             let _ = cx.update(|cx| {
                 let (more, open_with, new) = match result {
                     Ok((session, shell)) => split_shell_items(&me, session, shell, background, cx),
@@ -111,6 +121,7 @@ impl FolderView {
                         (Pending::Failed, Pending::Failed, Pending::Failed)
                     }
                 };
+                let open_with = with_own_programs(&me, own, open_with);
                 let inline = !cx.global::<crate::settings::Settings>().menu.shell_submenu;
                 if let Some(m) = menu_weak.upgrade() {
                     m.update(cx, |m, cx| {
@@ -827,6 +838,32 @@ fn create_shortcuts(items: Vec<PathBuf>) {
             }
         }
     });
+}
+
+/// One of the user's own programs for a kind of file, and its icon when the shell gave one.
+type OwnProgram = (String, Option<rf_win::thumbs::Bgra>);
+
+/// "Open with", with the user's own programs for the file's type first (in their order), then what Windows offers. Without a list
+/// for the type the submenu is Windows' alone. The programs are there also when the shell's part failed.
+fn with_own_programs(me: &Me, own: Vec<OwnProgram>, rest: Pending) -> Pending {
+    if own.is_empty() {
+        return rest;
+    }
+    let mut items: Vec<Item> = own
+        .into_iter()
+        .map(|(program, picture)| {
+            let picture = picture.as_ref().and_then(crate::image_cache::to_render_image).map(MenuIcon::Image).unwrap_or_else(|| icon(L::AppWindow));
+            let label = rf_core::openrules::program_label(&program);
+            Item::action(label, picture, act(me, move |v, window, cx| v.open_selection_in(program.clone(), window, cx)))
+        })
+        .collect();
+    if let Pending::Ready(more) = &rest
+        && !more.is_empty()
+    {
+        items.push(Item::Separator);
+        items.extend(more.iter().cloned());
+    }
+    Pending::Ready(Rc::new(items))
 }
 
 /// Turns the shell menu into our three lazy lists: "Show more options" (what is left after

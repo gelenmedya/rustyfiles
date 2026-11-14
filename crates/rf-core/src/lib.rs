@@ -6,6 +6,7 @@ pub mod format;
 pub mod history;
 pub mod hotkey;
 pub mod navtree;
+pub mod openrules;
 pub mod organize;
 pub mod previewpane;
 pub mod recycle_bin;

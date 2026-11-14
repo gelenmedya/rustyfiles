@@ -36,6 +36,7 @@ mod layouts;
 pub mod look;
 mod image_cache;
 mod installer;
+mod open_rules_page;
 mod ops;
 mod organizer;
 mod picker;
@@ -611,6 +612,7 @@ pub fn main() {
                     "speed" => settings_view::Page::Speed,
                     "general" => settings_view::Page::General,
                     "dock" => settings_view::Page::Dock,
+                    "filetypes" => settings_view::Page::FileTypes,
                     _ => settings_view::Page::Look,
                 },
                 cx,

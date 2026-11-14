@@ -39,6 +39,24 @@ fn exec(path: &Path, verb: Option<&str>, args: Option<&str>) -> anyhow::Result<(
     Ok(())
 }
 
+/// Starts a program (an `.exe`, a script, a shortcut) with a command line of its own and a working directory: what "Open with" does
+/// for a program the user named. No error box of the shell's: the caller says what went wrong.
+pub fn run_program(program: &Path, args: &str, dir: Option<&Path>) -> anyhow::Result<()> {
+    ensure_com();
+    let (file, args_w, dir_w) = (wide(program), wide(args), dir.map(wide));
+    let mut info = SHELLEXECUTEINFOW {
+        cbSize: std::mem::size_of::<SHELLEXECUTEINFOW>() as u32,
+        fMask: SEE_MASK_NOASYNC | SEE_MASK_FLAG_NO_UI,
+        lpFile: PCWSTR(file.as_ptr()),
+        lpParameters: PCWSTR(args_w.as_ptr()),
+        lpDirectory: dir_w.as_ref().map_or(PCWSTR::null(), |v| PCWSTR(v.as_ptr())),
+        nShow: SW_SHOWNORMAL.0,
+        ..Default::default()
+    };
+    unsafe { ShellExecuteExW(&mut info)? };
+    Ok(())
+}
+
 /// Opens a file with its default handler (same as double-click in Explorer).
 pub fn open(path: &Path) -> anyhow::Result<()> {
     exec(path, None, None)

@@ -390,7 +390,8 @@ impl LookWindow {
     fn open_file(&self) {
         let p = self.path.clone();
         rf_win::sta::run(move |_| {
-            if let Err(e) = rf_win::shell::open(&p) {
+            crate::open_rules_page::follow_file();
+            if let Err(e) = rf_win::openrules::open(&p) {
                 log::warn!("look open: {e:#}");
             }
         });

@@ -399,6 +399,9 @@ pub struct Settings {
     pub pinned: Option<Vec<PathBuf>>,
     /// Folder aliases: `@name` in the address box (Files' folder aliases).
     pub folder_aliases: std::collections::BTreeMap<String, PathBuf>,
+    /// The user's own programs for kinds of files (Settings > File types; `rf_core::openrules`): the first program of a list opens
+    /// such a file on a double click, all of them stand first under "Open with". Only rustyfiles follows them.
+    pub open_rules: Vec<rf_core::openrules::OpenRule>,
     /// Closing the last window keeps rustyfiles in the notification area (Files' "leave app
     /// running in the background"): the next window opens instantly.
     pub run_in_background: bool,
@@ -680,6 +683,7 @@ impl Default for Settings {
             session_active: 0,
             pinned: None,
             folder_aliases: Default::default(),
+            open_rules: Vec::new(),
             run_in_background: false,
             show_perf_info: false,
             notify_long_ops: true,
@@ -1023,6 +1027,7 @@ impl Settings {
         sync_name_index(self.name_index, &self.index_excluded);
         crate::i18n::set(self.language);
         crate::aliases::set(self.folder_aliases.clone());
+        rf_win::openrules::set(self.open_rules.clone());
         crate::background::sync_tray(self.run_in_background);
         crate::quick_search::sync(self);
         rf_core::format::set_date_style(match self.date_format {
@@ -1476,6 +1481,14 @@ dock_own_notifications = 3
         use super::DockMagnify;
         use rf_win::dock::magnify::Strength;
         assert_eq!(Settings::default().dock_magnify, DockMagnify::Full);
+        // the user's own programs for a kind of file: none at first, and a list comes back from the file as it was written
+        assert!(Settings::default().open_rules.is_empty());
+        let rule = rf_core::openrules::OpenRule { exts: vec!["dll".into(), "sys".into()], programs: vec![r"C:\Araçlar\dnSpy.exe".into()], double_click: false };
+        let text = toml::to_string_pretty(&Settings { open_rules: vec![rule.clone()], ..Default::default() }).unwrap();
+        assert!(text.contains("[[open_rules]]"), "{text}");
+        assert_eq!(Settings::parse_lenient(&text).unwrap().open_rules, vec![rule]);
+        let by_hand = Settings::parse_lenient("[[open_rules]]\nexts = [\"js\"]\nprograms = ['C:\\x.exe']\n").unwrap();
+        assert!(by_hand.open_rules[0].double_click, "a list written by hand without the switch opens on a double click");
         // the wheel over an icon: on, also for a file from before, and it can be switched off
         assert!(Settings::default().dock_scroll_volume);
         assert!(Settings::parse_lenient("theme = \"dark\"\n").unwrap().dock_scroll_volume);

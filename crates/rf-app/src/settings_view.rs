@@ -29,6 +29,7 @@ pub enum Page {
     Desktop,
     Layout,
     Files,
+    FileTypes,
     Actions,
     Tags,
     Look,
@@ -39,13 +40,14 @@ pub enum Page {
     About,
 }
 
-const PAGES: [(Page, L, &str); 14] = [
+const PAGES: [(Page, L, &str); 15] = [
     (Page::General, L::Settings, "Genel"),
     (Page::Appearance, L::Palette, "Görünüm"),
     (Page::Dock, L::PanelBottom, "Dock"),
     (Page::Desktop, L::Monitor, "Masaüstü"),
     (Page::Layout, L::LayoutGrid, "Sayfa düzeni"),
     (Page::Files, L::Folder, "Dosyalar ve klasörler"),
+    (Page::FileTypes, L::FileType, "Dosya türleri"),
     (Page::Actions, L::Keyboard, "Eylemler"),
     (Page::Tags, L::Tag, "Etiketler"),
     (Page::Look, L::Eye, "DirectLook"),
@@ -160,6 +162,7 @@ fn build_page(page: Page, p: &Palette, s: &Settings, cx: &mut App) -> Vec<AnyEle
         Page::Desktop => crate::desktop_page::page(p, s),
         Page::Layout => layout(p, s, cx),
         Page::Files => files(p, s, cx),
+        Page::FileTypes => crate::open_rules_page::page(p, s),
         Page::Actions => actions(p, cx),
         Page::Tags => tags(p, cx),
         Page::Look => look(p, s, cx),

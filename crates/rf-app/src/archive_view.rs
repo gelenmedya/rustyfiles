@@ -379,7 +379,7 @@ pub fn open_items(cx: &mut gpui_kit::App, paths: Vec<PathBuf>) {
             Err(e) => return Err(e),
         };
         for p in real {
-            rf_win::shell::open(&p)?;
+            rf_win::openrules::open(&p)?;
         }
         Ok(true)
     });

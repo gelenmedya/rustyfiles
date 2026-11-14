@@ -1125,7 +1125,7 @@ impl QuickSearch {
             (Target::Path { path, dir: false }, How::Open) => {
                 let p = path.clone();
                 launch(move || {
-                    if let Err(e) = rf_win::shell::open(&p) {
+                    if let Err(e) = rf_win::openrules::open(&p) {
                         log::warn!("quick search: open {}: {e:#}", p.display());
                     }
                 });

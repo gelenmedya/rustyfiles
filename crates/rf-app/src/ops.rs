@@ -899,6 +899,43 @@ impl FolderView {
         crate::properties_view::open(paths, self.images.clone(), cx);
     }
 
+    /// Opens the selected files with one of the user's own programs for their type (a row of "Open with"; Settings > File types).
+    /// A program that cannot be started is told to the user: this was asked for by name.
+    pub fn open_selection_in(&mut self, program: String, window: &mut Window, cx: &mut Context<Self>) {
+        let files = self.selection_paths();
+        if files.is_empty() {
+            return;
+        }
+        let (tx, rx) = oneshot::channel::<Option<String>>();
+        let started = program.clone();
+        std::thread::spawn(move || {
+            let mut failed = None;
+            for f in &files {
+                if let Err(e) = rf_win::openrules::open_in(&started, f) {
+                    log::warn!("open with {started:?}: {e:#}");
+                    failed = Some(format!("{e:#}"));
+                    break;
+                }
+            }
+            let _ = tx.send(failed);
+        });
+        cx.spawn_in(window, async move |_, cx| {
+            if let Ok(Some(why)) = rx.await {
+                let _ = cx.update(|window, cx| {
+                    crate::prompt::show(
+                        format!("{}: {}", t!("Program başlatılamadı"), rf_core::openrules::program_label(&program)),
+                        Some(format!("{program}\n{why}")),
+                        None,
+                        vec![crate::prompt::Button::new(t!("Tamam"), crate::prompt::Kind::Primary, |_, _, _| Ok(()))],
+                        window,
+                        cx,
+                    );
+                });
+            }
+        })
+        .detach();
+    }
+
     pub fn open_with(&self) {
         if let Some(p) = self.selection_paths().into_iter().next() {
             rf_win::sta::run(move |_| {

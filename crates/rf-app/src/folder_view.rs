@@ -4219,7 +4219,8 @@ pub(crate) fn open_in_background(path: PathBuf, cx: &mut App) {
         } else {
             path
         };
-        if let Err(e) = rf_win::shell::open(&path) {
+        // (with the user's own program for the file's type when there is one: Settings > File types)
+        if let Err(e) = rf_win::openrules::open(&path) {
             log::warn!("open {path:?}: {e}");
         }
     });

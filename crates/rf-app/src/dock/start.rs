@@ -840,7 +840,7 @@ impl StartView {
         Self::let_it_come_forward();
         std::thread::spawn(move || {
             // (the path is not logged: it can be a document from the user's recent files)
-            if rf_win::sta::call(Duration::from_secs(15), move || rf_win::shell::open(&path)).and_then(Result::ok).is_none() {
+            if rf_win::sta::call(Duration::from_secs(15), move || rf_win::openrules::open(&path)).and_then(Result::ok).is_none() {
                 log::warn!("start: a file or folder could not be opened");
             }
         });

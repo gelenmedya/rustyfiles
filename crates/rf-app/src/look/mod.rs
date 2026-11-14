@@ -190,7 +190,8 @@ impl LookManager {
     pub fn run_and_close(cx: &mut App) {
         if let Some(p) = Self::current_path(cx) {
             rf_win::sta::run(move |_| {
-                if let Err(e) = rf_win::shell::open(&p) {
+                crate::open_rules_page::follow_file();
+                if let Err(e) = rf_win::openrules::open(&p) {
                     log::warn!("look run: {e:#}");
                 }
             });
