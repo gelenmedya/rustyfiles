@@ -427,6 +427,10 @@ pub struct FolderView {
     /// double-click time passes without a second click or a drag.
     slow_click: Option<(u32, u64)>,
     slow_click_serial: u64,
+    /// What the first click of a possible double click was made on (`completes_double`).
+    first_click: Option<FirstClick>,
+    /// Counts the listings shown (every `load`): a click belongs to the listing it was made in.
+    load_serial: u64,
     /// Entries of an in-flight background refresh (swapped in atomically when complete).
     soft_pending: Option<Vec<Entry>>,
     /// When Space opened Quick Look (a long press closes it again on release).
@@ -586,6 +590,8 @@ impl FolderView {
             name_hit: false,
             slow_click: None,
             slow_click_serial: 0,
+            first_click: None,
+            load_serial: 0,
             soft_pending: None,
             space_hold: None,
             soft_started: Instant::now(),
@@ -962,6 +968,8 @@ impl FolderView {
     }
 
     fn load(&mut self, cx: &mut Context<Self>) {
+        // (another listing: a click made before it is not the first click of a double click in it)
+        self.load_serial += 1;
         self.apply_folder_layout(cx);
         self.images.update(cx, |c, _| c.cancel_pending());
         self.git = None;
@@ -2335,7 +2343,17 @@ impl FolderView {
             crate::settings::ClickPref::Folders => self.entries[ei as usize].is_dir(),
             crate::settings::ClickPref::Always => true,
         };
-        if plain && (ev.click_count >= 2 || (single && ev.click_count == 1)) {
+        // A second click opens only what the first click of the pair was made on (`completes_double`). Otherwise it is a click like
+        // any other: it selects.
+        let name = self.entries[ei as usize].name.clone();
+        let double = ev.click_count >= 2 && completes_double(self.first_click.as_ref(), self.load_serial, Some(&name));
+        self.first_click = (ev.click_count == 1).then(|| FirstClick { load: self.load_serial, name: Some(name) });
+        if ev.click_count >= 2 && !double {
+            // (it landed on this row because the listing changed under the pointer: the user did not aim at it, so it does not even
+            // select it)
+            return;
+        }
+        if plain && (double || (single && ev.click_count == 1)) {
             self.select_only(vi);
             self.open_entry(ei, cx);
             return;
@@ -3644,8 +3662,11 @@ impl FolderView {
                         MouseButton::Left,
                         cx.listener(|this, ev: &MouseDownEvent, window, cx| {
                             window.focus(&this.focus, cx);
-                            // Settings → "Double-click an empty area to go up"
-                            if ev.click_count == 2 && cx.global::<crate::settings::Settings>().double_click_up {
+                            // Settings → "Double-click an empty area to go up": when both clicks were made on the empty area of
+                            // this listing (a double click that opened this folder does not also leave it)
+                            let double = ev.click_count == 2 && completes_double(this.first_click.as_ref(), this.load_serial, None);
+                            this.first_click = (ev.click_count == 1).then(|| FirstClick { load: this.load_serial, name: None });
+                            if double && cx.global::<crate::settings::Settings>().double_click_up {
                                 this.up(cx);
                                 return;
                             }
@@ -4423,6 +4444,52 @@ fn _assert_category_used(_: Category) {}
 fn trace_live() -> bool {
     static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
     *ON.get_or_init(|| std::env::var_os("RUSTYFILES_TRACE_LIVE").is_some())
+}
+
+/// What the first click of a possible double click was made on: the listing it was made in (`FolderView::load_serial`) and the
+/// entry's name, `None` for the empty area.
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct FirstClick {
+    load: u64,
+    name: Option<Arc<str>>,
+}
+
+/// Whether a click that Windows counts as the second of a double click is one HERE: its first click was made in this same listing
+/// and on the same thing (the entry `name`, or the empty area for `None`).
+///
+/// WHY (a user on Discord, 2026-11-14: "when you click on one of the drive really fast like usual explorer thing the folders doesn't
+/// load"). A drive or a folder tile of the Home page, a place in the sidebar, a part of the address opens on ONE click. A user who
+/// double-clicks it, as in Explorer, sent a second click, and that click landed on whatever the new listing had under the pointer by
+/// then: Windows still called it a double click, so the folder there was opened too (a double click on drive C: ended inside
+/// `C:\MSI`), or, on the empty area with "double-click an empty area to go up" on, the drive was left again. Windows counts clicks by
+/// time and place alone; what was under them is ours to know.
+fn completes_double(first: Option<&FirstClick>, load: u64, name: Option<&str>) -> bool {
+    first.is_some_and(|f| f.load == load && f.name.as_deref() == name)
+}
+
+#[cfg(test)]
+mod double_click_tests {
+    use super::{FirstClick, completes_double};
+
+    fn first(load: u64, name: Option<&str>) -> FirstClick {
+        FirstClick { load, name: name.map(Into::into) }
+    }
+
+    #[test]
+    fn a_double_click_is_two_clicks_on_the_same_thing_in_the_same_listing() {
+        let on_msi = first(7, Some("MSI"));
+        assert!(completes_double(Some(&on_msi), 7, Some("MSI")));
+        // the first click was made before this listing was shown (it opened the drive from the Home page)
+        assert!(!completes_double(Some(&on_msi), 8, Some("MSI")));
+        assert!(!completes_double(None, 8, Some("MSI")), "no first click here at all");
+        // the same listing, another entry (the list moved under the pointer between the clicks)
+        assert!(!completes_double(Some(&on_msi), 7, Some("Program Files")));
+        // the empty area: both clicks on it, in this listing
+        let on_empty = first(7, None);
+        assert!(completes_double(Some(&on_empty), 7, None));
+        assert!(!completes_double(Some(&on_empty), 8, None), "the folder was just opened: it is not left again");
+        assert!(!completes_double(Some(&on_msi), 7, None) && !completes_double(Some(&on_empty), 7, Some("MSI")), "a row and the empty area are not the same thing");
+    }
 }
 
 #[cfg(test)]
