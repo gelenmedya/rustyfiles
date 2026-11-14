@@ -14,9 +14,28 @@ pub const REPO: &str = "https://github.com/gelenmedya/rustyfiles";
 /// AppUserModelID of the installed app (Velopack names shortcuts "velopack.<pack id>").
 pub const APP_ID: &str = "velopack.rustyfiles";
 
+/// Whether a process started with this first argument may apply a waiting update as it starts. Velopack does that before any code
+/// of ours runs, and it ends every running rustyfiles process to do it.
+///
+/// WHY NOT EVERY PROCESS (the updater's log on the user's PC, 2026-11-14: an update from 0.7.0 to 0.7.2 was applied by a process
+/// started with `--pick`, that is by another program's Open dialog; the dock, the picker, the quick search and the main app in the
+/// background are all started without the user asking for rustyfiles). Only a start the user means as "open rustyfiles" applies it:
+/// no argument, a folder or file to open, or a Settings page. Everything that begins with `--` otherwise is a side process (and
+/// the updater's own hooks, which never apply anything). The update is not lost: the next such start applies it, and so does the
+/// button in Settings and in the status bar.
+pub fn applies_update_at_start(first_arg: Option<&str>) -> bool {
+    match first_arg {
+        None => true,
+        Some(a) if a.starts_with("--settings=") => true,
+        Some(a) => !a.starts_with("--"),
+    }
+}
+
 /// First thing in `main`: Velopack's install / update / uninstall hooks run here and exit.
 pub fn startup() {
+    let first = std::env::args().nth(1);
     VelopackApp::build()
+        .set_auto_apply_on_startup(applies_update_at_start(first.as_deref()))
         .on_after_install_fast_callback(|_| {
             after_install_or_update();
             dialogs_on_by_default();
@@ -392,5 +411,21 @@ mod tests {
         s.first_start_ms = now - week - 1;
         s.star_asked = true;
         assert!(!star_due(&s));
+    }
+}
+
+#[cfg(test)]
+mod start_apply_tests {
+    use super::applies_update_at_start;
+
+    /// A waiting update is applied when the user opens rustyfiles, and never by a process started behind the user's back.
+    #[test]
+    fn only_a_start_the_user_means_applies_a_waiting_update() {
+        for open in [None, Some(r"C:\Users\x\Documents"), Some("D:\\"), Some("report.pdf"), Some("--settings=dock"), Some("--settings=speed")] {
+            assert!(applies_update_at_start(open), "{open:?}");
+        }
+        for side in ["--pick", "--dock", "--shell", "--quick-search", "--no-window", "--update-splash", "--bar-preview", "--shell-probe", "--veloapp-updated", "--veloapp-obsolete"] {
+            assert!(!applies_update_at_start(Some(side)), "{side}");
+        }
     }
 }
