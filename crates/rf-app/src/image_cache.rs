@@ -10,7 +10,7 @@ use futures::StreamExt;
 use futures::channel::mpsc;
 use gpui_kit::*;
 use rf_core::Entry;
-use rf_win::thumbs::{Bgra, Kind, Request, Response, ThumbPool, has_unique_icon};
+use rf_win::thumbs::{Bgra, Kind, Request, Response, ThumbPool, folder_has_own_icon, has_unique_icon};
 
 enum Slot {
     Pending,
@@ -262,10 +262,14 @@ impl ImageCache {
         });
     }
 
-    /// Small shell icon for a row. Generic types are cached per extension, folders once.
+    /// Small shell icon for a row. Generic types are cached per extension, plain folders once; a folder that can have an icon of its
+    /// own (`folder_has_own_icon`) is asked for it, like a program or a shortcut.
     pub fn icon(&mut self, dir: &Path, e: &Entry, cx: &mut Context<Self>) -> Option<Arc<RenderImage>> {
-        let unique = !e.is_dir() && has_unique_icon(&e.ext);
-        let key = if e.is_dir() {
+        let unique = own_picture(e);
+        let key = if unique && e.is_dir() {
+            // (with the folder's time and attributes: an icon chosen later changes one of them, and the old picture is not kept)
+            key_of(&[&"dirpath", &dir, &&*e.name, &e.modified_ms, &e.attrs, &ICON_PX])
+        } else if e.is_dir() {
             key_of(&[&"dir", &ICON_PX])
         } else if unique {
             key_of(&[&"path", &dir, &&*e.name, &ICON_PX])
@@ -317,8 +321,10 @@ impl ImageCache {
 
     fn thumbnail_as(&mut self, dir: &Path, e: &Entry, size: u32, urgent: bool, cx: &mut Context<Self>) -> Option<Arc<RenderImage>> {
         let wants_thumb = crate::icons::has_thumbnail(e);
-        let per_file = wants_thumb || (!e.is_dir() && has_unique_icon(&e.ext));
-        let key = if per_file {
+        let per_file = wants_thumb || own_picture(e);
+        let key = if per_file && e.is_dir() && !wants_thumb {
+            key_of(&[&"dirpathL", &dir, &&*e.name, &e.modified_ms, &e.attrs, &size])
+        } else if per_file {
             file_picture_key(urgent && wants_thumb, dir, &e.name, &e.modified_ms, size)
         } else if e.is_dir() {
             key_of(&[&"dirL", &size])
@@ -360,10 +366,30 @@ impl ImageCache {
     }
 }
 
+/// Whether an entry's icon is its own and not its kind's: a program, a shortcut and the like, and a folder that Windows marks as
+/// customised (its own icon from `desktop.ini`, or the picture of Downloads, Documents ...).
+fn own_picture(e: &Entry) -> bool {
+    if e.is_dir() { folder_has_own_icon(e.attrs) } else { has_unique_icon(&e.ext) }
+}
+
 #[cfg(test)]
 mod tests {
     // (not `super::*`: the toolkit's glob import brings a `test` attribute of its own that shadows the standard one)
-    use super::{cost, file_picture_key, forget_pending};
+    use super::{cost, file_picture_key, forget_pending, own_picture};
+
+    /// A plain folder shares the folders' one picture; a folder Windows marks as customised (read-only or system) is asked for its
+    /// own, as a program is; a document is not.
+    #[test]
+    fn a_customised_folder_and_a_program_have_pictures_of_their_own() {
+        use rf_core::{Entry, EntryKind};
+        let dir = |attrs: u32| Entry::new("klasör", EntryKind::Dir, 0, 0, 0, 0x10 | attrs);
+        assert!(!own_picture(&dir(0)), "a plain folder");
+        assert!(!own_picture(&dir(0x2)), "a hidden folder is not a customised one");
+        assert!(own_picture(&dir(0x1)), "read-only: how Explorer marks a folder with an icon of its own");
+        assert!(own_picture(&dir(0x4)), "a system folder (Downloads, Documents)");
+        assert!(own_picture(&Entry::new("a.exe", EntryKind::File, 1, 0, 0, 0x20)));
+        assert!(!own_picture(&Entry::new("a.txt", EntryKind::File, 1, 0, 0, 0x21)), "a read-only document is still its kind's picture");
+    }
     use std::collections::HashMap;
     use std::path::Path;
 

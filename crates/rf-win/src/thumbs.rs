@@ -168,6 +168,17 @@ fn hbitmap_to_bgra(hbmp: HBITMAP) -> anyhow::Result<Bgra> {
     }
 }
 
+/// Whether a folder with these attributes can have an icon of its own. The shell looks into a folder's `desktop.ini` (an icon the
+/// user chose under Properties > Customize, the pictures of Downloads, Documents and the like) only when the folder is read-only or
+/// a system folder: that is how Windows marks a customised folder. Such a folder is asked for its own icon; every other folder shares
+/// one picture. (A user on Discord, 2026-11-14: "there is an option to make folder icons ... in this new app the folder icons are
+/// gone": all folders shared the one picture.)
+pub fn folder_has_own_icon(attrs: u32) -> bool {
+    const READONLY: u32 = 0x1;
+    const SYSTEM: u32 = 0x4;
+    attrs & (READONLY | SYSTEM) != 0
+}
+
 /// Extensions whose icon differs per file (must not be cached by extension).
 pub fn has_unique_icon(ext: &str) -> bool {
     matches!(ext, "exe" | "lnk" | "ico" | "url" | "cur" | "ani" | "scr" | "cpl" | "msc" | "appref-ms" | "website")
@@ -509,6 +520,38 @@ mod tests {
             workers.push(t.seen.recv_timeout(WAIT).unwrap());
         }
         assert!(workers.iter().all(|w| !w.urgent && w.priority < 0), "the workers run below normal priority");
+    }
+
+    #[test]
+    fn only_a_read_only_or_system_folder_can_have_an_icon_of_its_own() {
+        const DIR: u32 = 0x10;
+        assert!(!folder_has_own_icon(DIR));
+        assert!(!folder_has_own_icon(DIR | 0x2), "hidden");
+        assert!(!folder_has_own_icon(DIR | 0x20 | 0x2000), "archive, not indexed");
+        assert!(folder_has_own_icon(DIR | 0x1));
+        assert!(folder_has_own_icon(DIR | 0x4));
+        assert!(folder_has_own_icon(DIR | 0x1 | 0x4 | 0x2));
+    }
+
+    /// On the system the tests run on: a folder given an icon of its own (as Properties > Customize does) is marked the way
+    /// `folder_has_own_icon` looks for, and the shell gives it a picture that is not the plain folder's.
+    #[test]
+    fn a_folder_with_its_own_icon_gets_its_own_picture() {
+        let base = std::env::temp_dir().join(format!("rf-foldericon-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        let (plain, own) = (base.join("plain"), base.join("own"));
+        std::fs::create_dir_all(&plain).unwrap();
+        std::fs::create_dir_all(&own).unwrap();
+        // (shell32's icon 15 is the computer: nothing like a folder)
+        crate::folder_custom::set_folder_icon(&own, Some((r"C:\Windows\System32\shell32.dll", 15))).unwrap();
+        let attrs_of = |p: &Path| unsafe { windows::Win32::Storage::FileSystem::GetFileAttributesW(windows::core::PCWSTR(crate::wide::wide(p).as_ptr())) };
+        let (a_plain, a_own) = (attrs_of(&plain), attrs_of(&own));
+        let (i_plain, i_own) = (get_image(&plain, 32, Kind::Icon).unwrap(), get_image(&own, 32, Kind::Icon).unwrap());
+        // (the folder is read-only now: take the mark off so that the scratch folder can be removed)
+        let _ = crate::folder_custom::set_folder_icon(&own, None);
+        let _ = std::fs::remove_dir_all(&base);
+        assert!(!folder_has_own_icon(a_plain) && folder_has_own_icon(a_own), "plain {a_plain:#x}, customised {a_own:#x}");
+        assert!(i_plain.data != i_own.data, "the customised folder's picture is the plain folder's");
     }
 
     #[test]
