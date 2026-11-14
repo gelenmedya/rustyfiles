@@ -13,9 +13,16 @@ use rf_core::organize::rule::parse_ext_list;
 use rf_core::organize::summary::{SizeUnit, show_path};
 use rf_core::organize::{Action, Cmp, Condition, Dest, FileFact, FileKind, Join, NameOp, ProtectedPaths, Rule, RuleProblem, TEMPLATE_VARS, TimeField};
 
-use crate::select_box::{Choice, select_box_h};
+use crate::select_box::{Choice, select_box_fill, select_box_h};
 use crate::t;
 use crate::theme::{self, Palette};
+
+/// The width of a condition's first column, the field ("Uzantı", "Değiştirme tarihi"): room for the longest of them with the
+/// field's padding and its arrow. The select box in it takes this width (`select_box_fill`); a box that sizes itself is never
+/// narrower than `select_box::MIN_W` and stood 30 px out of a 150 px column, over the words beside it (issue 12).
+const FIELD_COL: f32 = 170.0;
+/// The width of the size unit's column ("KB", "MB", "GB").
+const UNIT_COL: f32 = 96.0;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum Field {
@@ -39,6 +46,18 @@ impl Field {
             Field::Modified => t!("Değiştirme tarihi"),
             Field::Created => t!("Oluşturma tarihi"),
         }
+    }
+}
+
+/// The example a condition's value box shows while it is empty: what is typed there for this field. It follows the field when the
+/// field is changed (it did not: a size condition made from an extension one still said "jpg, png").
+fn value_hint(field: Field) -> &'static str {
+    match field {
+        Field::Name => t!("Aranacak metin"),
+        Field::Extension => t!("jpg, png"),
+        Field::Size => "5",
+        Field::Modified | Field::Created => "30",
+        Field::Kind => "",
     }
 }
 
@@ -210,14 +229,7 @@ impl EditorView {
     }
 
     fn blank_row(field: Field, window: &mut Window, cx: &mut Context<Self>) -> CondRow {
-        let placeholder = match field {
-            Field::Name => t!("Aranacak metin"),
-            Field::Extension => t!("jpg, png"),
-            Field::Size => "5",
-            Field::Modified | Field::Created => "30",
-            Field::Kind => "",
-        };
-        CondRow { field, name_op: NameOp::Contains, cmp: Cmp::Greater, text: new_input(window, cx, placeholder, ""), kinds: Vec::new(), unit: SizeUnit::Mb }
+        CondRow { field, name_op: NameOp::Contains, cmp: Cmp::Greater, text: new_input(window, cx, value_hint(field), ""), kinds: Vec::new(), unit: SizeUnit::Mb }
     }
 
     fn row_of(c: &Condition, window: &mut Window, cx: &mut Context<Self>) -> CondRow {
@@ -566,7 +578,7 @@ impl Render for EditorView {
         for (i, row) in self.conds.iter().enumerate() {
             let field = row.field;
             let me1 = me.clone();
-            let field_box = select_box_h(SharedString::from(format!("ed-field-{i}")), &p, field.label(), 32., move |_| {
+            let field_box = select_box_fill(SharedString::from(format!("ed-field-{i}")), &p, field.label(), 32., move |_| {
                 Field::ALL
                     .iter()
                     .map(|&f| {
@@ -579,7 +591,10 @@ impl Render for EditorView {
                                     row.field = f;
                                     row.cmp = Cmp::Greater;
                                     row.kinds.clear();
-                                    row.text.update(cx, |s, cx| s.set_value("", window, cx));
+                                    row.text.update(cx, |s, cx| {
+                                        s.set_value("", window, cx);
+                                        s.set_placeholder(value_hint(f), window, cx);
+                                    });
                                 }
                                 cx.notify();
                             })
@@ -658,7 +673,7 @@ impl Render for EditorView {
                         .flex_1()
                         .min_w_0()
                         .child(div().flex_1().min_w_0().child(input_box(&row.text, &p)))
-                        .child(div().w(px(90.)).child(select_box_h(SharedString::from(format!("ed-unit-{i}")), &p, unit.label(), 32., move |_| {
+                        .child(div().w(px(UNIT_COL)).flex_shrink_0().child(select_box_fill(SharedString::from(format!("ed-unit-{i}")), &p, unit.label(), 32., move |_| {
                             SizeUnit::ALL
                                 .iter()
                                 .map(|&u| {
@@ -688,7 +703,7 @@ impl Render for EditorView {
             };
             let is_age = matches!(field, Field::Modified | Field::Created);
             // (Turkish puts the number first: "30 günden daha eski")
-            let mut line = h_flex().gap_2().items_start().child(div().w(px(150.)).flex_shrink_0().child(field_box));
+            let mut line = h_flex().gap_2().items_start().child(div().w(px(FIELD_COL)).flex_shrink_0().child(field_box));
             line = if is_age { line.child(value).child(div().flex_shrink_0().child(op_box)) } else { line.child(div().flex_shrink_0().child(op_box)).child(value) };
             cond_rows = cond_rows.child(
                 line
@@ -924,5 +939,34 @@ impl Render for EditorView {
                     .child(footer)
                     .with_animation("organizer-editor-in", Animation::new(std::time::Duration::from_millis(160)).with_easing(ease_out_quint()), |el, t| el.opacity(t).mt(px(10. * (1. - t)))),
             )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    // (not `super::*`: the glob of the UI kit above carries its own `test` attribute)
+    use super::{FIELD_COL, Field, UNIT_COL, value_hint};
+
+    /// Each field's example is what is typed for that field: a number for a size and for a number of days, nothing for the kinds
+    /// (they are chosen, not typed), words for a name and for extensions.
+    #[test]
+    fn the_example_in_a_conditions_value_box_is_its_fields_own() {
+        for f in Field::ALL {
+            let hint = value_hint(f);
+            match f {
+                Field::Size | Field::Modified | Field::Created => assert!(hint.parse::<u32>().is_ok(), "{hint:?}"),
+                Field::Kind => assert!(hint.is_empty()),
+                Field::Name | Field::Extension => assert!(!hint.is_empty() && hint.parse::<u32>().is_err(), "{hint:?}"),
+            }
+        }
+        assert_ne!(value_hint(Field::Name), value_hint(Field::Extension));
+    }
+
+    /// The two columns that hold a select box are narrower than the smallest width such a box takes by itself: that is why the boxes
+    /// in them are the kind that fills its column (a box that sizes itself stood out of the column, issue 12).
+    #[test]
+    fn the_narrow_columns_are_narrower_than_a_select_box_that_sizes_itself() {
+        assert!(FIELD_COL < crate::select_box::MIN_W && UNIT_COL < crate::select_box::MIN_W);
+        assert!(FIELD_COL >= 150.0 && UNIT_COL >= 80.0);
     }
 }

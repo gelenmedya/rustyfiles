@@ -57,12 +57,28 @@ pub fn select_box(id: impl Into<SharedString>, p: &Palette, label: impl Into<Sha
 
 /// [`select_box`] at a given height (to line up with other controls in a row).
 pub fn select_box_h(id: impl Into<SharedString>, p: &Palette, label: impl Into<SharedString>, height: f32, choices: impl Fn(&App) -> Vec<Choice> + 'static) -> AnyElement {
+    field(id, p, label, height, false, choices)
+}
+
+/// [`select_box_h`] as wide as the box it is put in, for a column of a row that has a width of its own. The field's usual smallest
+/// width ([`MIN_W`]) is wider than a narrow column: there the field stood out of its column and over what was beside it (issue 12, a
+/// user's picture of the rule editor: "Extension" lay over "is one of").
+pub fn select_box_fill(id: impl Into<SharedString>, p: &Palette, label: impl Into<SharedString>, height: f32, choices: impl Fn(&App) -> Vec<Choice> + 'static) -> AnyElement {
+    field(id, p, label, height, true, choices)
+}
+
+/// The smallest and the largest width of a field that sizes itself.
+pub const MIN_W: f32 = 180.0;
+const MAX_W: f32 = 320.0;
+
+fn field(id: impl Into<SharedString>, p: &Palette, label: impl Into<SharedString>, height: f32, fill: bool, choices: impl Fn(&App) -> Vec<Choice> + 'static) -> AnyElement {
     let key: SharedString = id.into();
     let bounds = Rc::new(Cell::new(Bounds::<Pixels>::default()));
     let seen = bounds.clone();
-    let base = h_flex().id(ElementId::Name(key.clone())).relative().h(px(height)).min_w(px(180.)).max_w(px(320.)).gap_2().items_center().text_sm().cursor_pointer()
+    let base = h_flex().id(ElementId::Name(key.clone())).relative().h(px(height)).gap_2().items_center().text_sm().cursor_pointer()
         // Tab reaches the field, Enter / Space opens it
         .tab_index(0);
+    let base = if fill { base.w_full().min_w_0() } else { base.min_w(px(MIN_W)).max_w(px(MAX_W)) };
     // over glass: a capsule with a chevron-down, a wash of white or black and no border; otherwise the bordered field
     let (field, chevron) = if p.liquid {
         let dark = p.dark;
