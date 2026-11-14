@@ -504,7 +504,12 @@ fn open_panel(id: PanelId, cx: &mut App) {
     let want = panel(cx).map_or(MonId::HOME, |p| p.want_mon);
     host::force_active(want, cx);
     if host::is_fullscreen(cx) {
-        return;
+        // Over a full-screen program (a game) only the Start panel opens: it is asked for by the Windows key, and the dock comes back
+        // up for it (`host::peek_over_fullscreen`). Every other panel is asked for from an island, and the islands are hidden.
+        if id != PanelId::START {
+            return;
+        }
+        host::peek_over_fullscreen(cx);
     }
     let Some((scale, work)) = host::monitor_work(cx) else { return };
     let Some(p) = cx.try_global::<PanelHost>() else { return };

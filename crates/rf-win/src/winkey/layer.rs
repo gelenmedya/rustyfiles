@@ -102,7 +102,9 @@ impl KeyLayer {
                 self.given_up = true;
             }
         }
+        // (the switcher stands down for a stale beat and for a full-screen program; the Windows key only for a stale beat)
         let stand_down = self.shared.standing_down();
+        let stale = self.shared.stale();
         let log_only = self.shared.log_only();
 
         // ---- the keys of Win+E / Win+D that were taken: their repeats and their release follow their press, whatever state the layer is in
@@ -125,7 +127,7 @@ impl KeyLayer {
 
         // ---- the Windows key
         let mut taken = false;
-        if self.shared.win_on() && !stand_down {
+        if self.shared.win_on() && !stale {
             // About to decide on E or D with a Windows key believed down: ask the keyboard once (a cheap read, only on these two keys).
             // If it says neither Windows key is down, the belief is stale: drop it, so the letter passes as the typing it is.
             if k.down && !k.injected() && combo_slot(k.vk).is_some() && self.win.any_down() && let Some(p) = &self.probe && !p.down(VK_LWIN) && !p.down(VK_RWIN) {
@@ -591,21 +593,27 @@ mod tests {
     }
 
     #[test]
-    fn a_full_screen_program_in_front_stands_both_layers_down() {
+    fn a_full_screen_program_in_front_stands_the_switcher_down_but_the_windows_key_stays_ours() {
         let mut r = rig();
         r.shared.beat(true);
+        // Alt+Tab is Windows' own over a game
         r.alt_down();
         assert!(!r.tab_down());
         r.tab_up();
         r.alt_up();
+        assert_eq!(r.posted(), vec![], "the switcher was not asked for");
+        // the Windows key opens OUR Start there too: the mask keeps Windows' Start shut, the tap is posted
         r.win_down(VK_LWIN);
         r.win_up(VK_LWIN);
-        assert_eq!(r.mask.sent(), 0);
-        assert_eq!(r.posted(), vec![]);
+        assert_eq!(r.mask.sent(), 1);
+        assert_eq!(r.posted(), vec![Posted::StartTap]);
+        // and nothing changes for it when the program leaves
         r.shared.beat(false);
         r.win_down(VK_LWIN);
         r.win_up(VK_LWIN);
-        assert_eq!(r.posted(), vec![Posted::StartTap], "and it is back when the program leaves");
+        assert_eq!(r.posted(), vec![Posted::StartTap]);
+        r.alt_down();
+        assert!(r.tab_down(), "the switcher is back when the program leaves");
     }
 
     #[test]
@@ -763,9 +771,9 @@ mod tests {
     #[test]
     fn a_windows_key_pressed_while_the_layer_stands_down_and_released_after_it_is_back_is_not_a_tap() {
         let mut r = rig();
-        r.shared.beat(true); // a full-screen program: standing down
+        r.clock.set(10_000 + STALE_AFTER_MS + 500); // the interface is stuck: standing down
         r.win_down(VK_LWIN);
-        r.shared.beat(false);
+        r.shared.beat(false); // and back
         assert!(!r.win_up(VK_LWIN));
         assert_eq!(r.posted(), vec![], "its press was not ours to see");
         assert_eq!(r.mask.sent(), 0);

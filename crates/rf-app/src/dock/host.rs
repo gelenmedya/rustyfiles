@@ -252,6 +252,9 @@ struct Dock {
     content: Content,
     /// A full-screen program is in front on this monitor: the islands are hidden.
     fullscreen: bool,
+    /// The dock was brought up over a full-screen program for the Start panel ([`peek_over_fullscreen`]): until then it stays up
+    /// whatever is said about the program in front.
+    peek_until: Option<Instant>,
     /// The region the middle window has been given last (`None`: none yet, or it must be given again).
     region: Option<Vec<hit::Part>>,
     /// How far (device px) the side islands' glass is lowered inside their windows now ([`side_drop`]): nothing for the usual side
@@ -1014,7 +1017,7 @@ fn on_system_event(ev: SystemEvent, cx: &mut App) {
             if let Some(host) = host_mut(cx)
                 && let Some(d) = host.dock_mut(MonId::HOME)
             {
-                d.fullscreen = on;
+                d.fullscreen = hidden_for_fullscreen(on, d.peek_until, Instant::now());
             }
             apply_visibility(MonId::HOME, cx);
         }
@@ -1129,6 +1132,7 @@ fn open_dock(d: &monitors::Display, cx: &mut App) {
         geo: None,
         content: Content { primary: false, search: Search::Field, bell: true },
         fullscreen: false,
+        peek_until: None,
         region: None,
         side_drop: 0,
         told_bands: Vec::new(),
@@ -1286,6 +1290,57 @@ fn sync_secondary_watch(cx: &mut App) {
     }
 }
 
+/// How long a dock that was brought up over a full-screen program stays up whatever is in front: within this time the Start panel
+/// has taken the keyboard, and from then on the window in front is ours and no full-screen program's.
+const PEEK_FOR: Duration = Duration::from_millis(1500);
+
+/// Whether a dock is hidden for a full-screen program: when one is in front (`told`), unless the dock was just brought up over it
+/// for the Start panel (`peek_until` still ahead of `now`).
+fn hidden_for_fullscreen(told: bool, peek_until: Option<Instant>, now: Instant) -> bool {
+    told && !peek_until.is_some_and(|until| now < until)
+}
+
+/// The Windows key over a full-screen program (a game): the active monitor's dock comes back up, so that the Start panel has its
+/// island to sit above and grow from. The user: "oyundayken windows tuşuna basınca hala normal başlat açılıyor bizimki değil".
+///
+/// Until now our panels never opened over a full-screen program, and the keyboard layer left the Windows key to Windows there. Now
+/// the tap is ours there too, and this is the other half: the dock counts as not hidden for a moment ([`PEEK_FOR`]). In that time the
+/// Start panel takes the keyboard, the window in front is then ours, and Windows itself says that no full-screen program is in front
+/// any more. When the panel closes and the program has the keyboard again, the dock hides as always. Should the panel never get the
+/// keyboard, the look at the end of the moment hides the dock again.
+pub fn peek_over_fullscreen(cx: &mut App) {
+    let Some(host) = host_mut(cx) else { return };
+    let id = host.active;
+    let Some(d) = host.dock_mut(id) else { return };
+    d.fullscreen = false;
+    d.peek_until = Some(Instant::now() + PEEK_FOR);
+    apply_visibility(id, cx);
+    cx.spawn(async move |cx| {
+        cx.background_executor().timer(PEEK_FOR + Duration::from_millis(60)).await;
+        cx.update(|cx| end_peek(id, cx));
+    })
+    .detach();
+}
+
+/// The moment of [`peek_over_fullscreen`] is over: when a full-screen program is in front on that monitor after all (the panel was
+/// closed again at once, or never took the keyboard), the dock goes down again.
+fn end_peek(id: MonId, cx: &mut App) {
+    let now = Instant::now();
+    let Some(host) = host_mut(cx) else { return };
+    let Some(d) = host.dock_mut(id) else { return };
+    // (a later tap began a moment of its own: its own look ends it)
+    if d.peek_until.is_none_or(|until| now < until) {
+        return;
+    }
+    d.peek_until = None;
+    let fg = rf_win::dock::fullscreen::foreground();
+    let on = rf_win::dock::fullscreen::is_fullscreen(fg.as_ref(), d.monitor.rect);
+    if on != d.fullscreen {
+        d.fullscreen = on;
+        apply_visibility(id, cx);
+    }
+}
+
 /// One look at the window in front, for every secondary monitor. False: the dock is gone.
 fn look_for_fullscreen(cx: &mut App) -> bool {
     let Some(host) = cx.try_global::<Host>() else { return false };
@@ -1294,7 +1349,9 @@ fn look_for_fullscreen(cx: &mut App) -> bool {
     }
     // (one read of the window in front serves every monitor)
     let fg = rf_win::dock::fullscreen::foreground();
-    let verdicts: Vec<(MonId, bool)> = host.docks.iter().filter(|d| !d.id.is_home()).map(|d| (d.id, rf_win::dock::fullscreen::is_fullscreen(fg.as_ref(), d.monitor.rect))).collect();
+    let now = Instant::now();
+    let verdicts: Vec<(MonId, bool)> =
+        host.docks.iter().filter(|d| !d.id.is_home()).map(|d| (d.id, hidden_for_fullscreen(rf_win::dock::fullscreen::is_fullscreen(fg.as_ref(), d.monitor.rect), d.peek_until, now))).collect();
     let mut changed = Vec::new();
     if let Some(h) = host_mut(cx) {
         for (id, on) in verdicts {
@@ -1638,6 +1695,7 @@ pub fn run(messages: Option<UnboundedReceiver<String>>, cx: &mut App) {
         geo: Some(geo),
         content: Content::HOME,
         fullscreen: false,
+        peek_until: None,
         region: None,
         side_drop: 0,
         told_bands: Vec::new(),
@@ -1836,6 +1894,20 @@ pub fn run(messages: Option<UnboundedReceiver<String>>, cx: &mut App) {
 #[cfg(test)]
 mod tests {
     use super::{Changes, Geo, Kind, MonId, Prefs, Settings, changes, file_changed, lowered, lowered_rect, panel_is_hit, region_differs, side_drop, switch_stops};
+
+    /// A dock hides for a full-screen program, except in the moment after it was brought up over one for the Start panel.
+    #[test]
+    fn a_dock_brought_up_for_start_stays_up_for_its_moment() {
+        use std::time::{Duration, Instant};
+        let now = Instant::now();
+        assert!(super::hidden_for_fullscreen(true, None, now), "a full-screen program in front hides the dock");
+        assert!(!super::hidden_for_fullscreen(false, None, now));
+        let until = now + Duration::from_millis(1500);
+        assert!(!super::hidden_for_fullscreen(true, Some(until), now), "the Windows key was just tapped over the program: the dock stays up");
+        assert!(!super::hidden_for_fullscreen(true, Some(until), now + Duration::from_millis(1499)));
+        assert!(super::hidden_for_fullscreen(true, Some(until), until), "the moment is over");
+        assert!(!super::hidden_for_fullscreen(false, Some(until), now), "nothing full-screen in front: shown either way");
+    }
     use rf_win::dock::hit::{self, Part};
     use rf_win::dock::layout::{self, Rect, Widths};
     use rf_win::dock::panel::{self as panel_geo, Side};

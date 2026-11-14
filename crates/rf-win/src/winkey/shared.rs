@@ -212,13 +212,19 @@ impl Shared {
         self.combos_on.load(Ordering::Relaxed)
     }
 
-    /// True when the layer must pass every key: the heartbeat is stale or was never made, or a full-screen program is in front.
-    pub fn standing_down(&self) -> bool {
-        if self.fullscreen.load(Ordering::Relaxed) {
-            return true;
-        }
+    /// True when the whole layer must pass every key: the heartbeat is stale or was never made (the interface's thread is not
+    /// answering, so nothing it would be asked to open could open).
+    pub fn stale(&self) -> bool {
         let beat = self.heartbeat.load(Ordering::Acquire);
         beat == 0 || self.clock.now_ms().saturating_add(1).saturating_sub(beat) > STALE_AFTER_MS
+    }
+
+    /// True when the SWITCHER's part must pass every key: [`stale`](Self::stale), or a full-screen program is in front (a game keeps
+    /// Windows' own Alt+Tab, which knows how to take it out of full screen). The Windows key does NOT stand down for a full-screen
+    /// program: the user who chose our Start means it in a game too ("oyundayken windows tuşuna basınca hala normal başlat açılıyor
+    /// bizimki değil"), and the dock brings its Start panel up over the program (`dock::host::peek_over_fullscreen`).
+    pub fn standing_down(&self) -> bool {
+        self.fullscreen.load(Ordering::Relaxed) || self.stale()
     }
 
     /// Posts to the interface and wakes the dispatcher. Never blocks, never allocates.
@@ -295,13 +301,17 @@ mod tests {
     }
 
     #[test]
-    fn a_full_screen_program_in_front_stands_it_down_and_leaving_it_brings_it_back() {
+    fn a_full_screen_program_in_front_stands_the_switcher_down_and_leaving_it_brings_it_back() {
         let (clock, s) = shared();
         clock.set(100);
         s.beat(true);
         assert!(s.standing_down());
+        assert!(!s.stale(), "the interface is alive: the Windows key is still ours");
         s.beat(false);
         assert!(!s.standing_down());
+        // a stale beat stands everything down, full screen or not
+        clock.set(100 + STALE_AFTER_MS + 1);
+        assert!(s.stale() && s.standing_down());
     }
 
     #[test]

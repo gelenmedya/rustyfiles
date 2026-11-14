@@ -59,7 +59,7 @@ setting is off, and the mask key comes back this way). On the release of a clean
 release pass, and posts `StartTap`; the host toggles the Start panel (`dock::toggle_start`). Win+anything is never touched: the other
 key makes the hold a chord, the Windows key's own events are never swallowed.
 
-While the layer does not look (stale beat, a full-screen program, the setting off) the machine still learns which Windows keys are
+While the layer does not look (stale beat, the setting off) the machine still learns which Windows keys are
 held (`WinMachine::observe_unseen`) and that their company was not seen: such a hold is never a tap, and the first auto-repeat after the
 layer is back is not a fresh press (Win+arrow held through a stand-down must not end as a tap).
 
@@ -91,7 +91,7 @@ the release of a later, plain Tab.
 | FAIL OPEN, stale heartbeat | `stale_heartbeat_fails_open_every_key_passes_and_nothing_is_swallowed_sent_or_posted` |
 | FAIL OPEN, heartbeat never made | `a_heartbeat_that_was_never_stamped_passes_every_key` |
 | Back when the beat returns | `the_layer_comes_back_when_the_heartbeat_does` |
-| Stand down for a full-screen program | `a_full_screen_program_in_front_stands_both_layers_down` |
+| A full-screen program: the switcher stands down, the Windows key stays ours | `a_full_screen_program_in_front_stands_the_switcher_down_but_the_windows_key_stays_ours` |
 | A swallowed press has its release swallowed, even after standing down | `a_key_that_was_swallowed_down_has_its_release_swallowed_even_after_the_layer_stood_down` |
 | A press that passed never has its release swallowed | `a_key_that_passed_down_has_its_release_passed_not_swallowed`, `a_press_while_the_layer_stands_down_passes_and_its_release_passes_after_the_layer_comes_back` |
 | Alt and the Windows keys are never swallowed | `alt_and_the_windows_keys_are_never_swallowed_in_any_state_of_the_chord`, `a_clean_tap_of_the_windows_key_sends_the_mask_once_...` |
@@ -124,11 +124,21 @@ in the middle of Alt+Tab cannot leave a key down.
 
 When the layer stands down in the middle of a chord it closes the chord and posts `Lost`; the host closes the switcher.
 
-### Why stand down for a full-screen program
+### A full-screen program: the switcher stands down, the Windows key does not
 
-Our panels do not open above a full-screen window (`open_panel` returns at once, the islands are hidden), so a swallowed Windows-key
-tap would do nothing at all, and a game that is asked to leave full screen by Alt+Tab would lose its own. Windows' own behaviour is the
-better one there. The test is the dock's, stamped with the beat, so it can be up to 250 ms late.
+Alt+Tab stands down while a full-screen program is in front: a game that is asked to leave full screen by Alt+Tab would lose its own,
+and Windows' switcher knows how to take it out of full screen. The test is the dock's, stamped with the beat, so it can be up to
+250 ms late.
+
+The Windows key stood down there too until 2026-11-14, because our panels did not open above a full-screen window, so a swallowed tap
+would have done nothing. The user's report ("oyundayken windows tuşuna basınca hala normal başlat açılıyor bizimki değil") changed
+it: whoever chose our Start means it in a game too. Now the tap is posted there as anywhere (only a stale beat stands the Windows key
+down, `Shared::stale`), and the dock does the other half: `open_panel` lets the Start panel, and only it, open over a full-screen
+program, after `dock::host::peek_over_fullscreen` has brought the dock back up for a moment (1.5 s) in which the panel takes the
+keyboard. From then on the window in front is ours and Windows itself says no full-screen program is in front; when the panel closes
+and the program has the keyboard again the dock hides as always, and a look at the end of the moment hides it if the panel never got
+the keyboard. If the panel cannot open at all, the fallback above still asks Windows for its Start. NOT TRIED with a real game and a
+real key when it was written: the rule and the dock's part are tests; the first run was the user's.
 
 ## A hook that Windows dropped
 
