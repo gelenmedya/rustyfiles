@@ -63,19 +63,39 @@ pub fn start_packaged_with(aumid: &str, args: &str) -> anyhow::Result<()> {
     crate::shellfolder::open(&format!("shell:AppsFolder\\{aumid}")).map_err(|second| anyhow::anyhow!("{first}; the shell: {second}"))
 }
 
+/// How a task window is brought forward, once its restore (if it was minimised) has been asked for.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Way {
+    /// The usual way: the foreground calls.
+    Front,
+    /// The way Alt+Tab itself switches (`SwitchToThisWindow`): for a minimised window whose restore Windows refused.
+    AltTab,
+}
+
+/// The decision of [`activate`]. A restore is refused for a window of a program that runs with more rights than ours (as
+/// administrator: `ShowWindowAsync` answers false, error 5), and a window that stays minimised cannot be brought forward by any
+/// foreground call. Measured on the user's PC, 2026-11-14 ("docktaki bazı uygulamalara tıklayınca öne gelmiyorlar"; the app was the
+/// one running as administrator): the restore was refused and the window stayed minimised, `SwitchToThisWindow` restored it and put
+/// it in front.
+pub fn way(minimized: bool, restore_taken: bool) -> Way {
+    if minimized && !restore_taken { Way::AltTab } else { Way::Front }
+}
+
 /// Brings a task window to the front and gives it the keyboard; a minimised one is restored first. The restore is asked
 /// without waiting (a window that hangs must not hang the dock).
 pub fn activate(hwnd: isize) {
     let h = HWND(hwnd as *mut _);
-    unsafe {
+    let (minimized, taken) = unsafe {
         if !IsWindow(Some(h)).as_bool() {
             return;
         }
-        if IsIconic(h).as_bool() {
-            let _ = ShowWindowAsync(h, SW_RESTORE);
-        }
+        let minimized = IsIconic(h).as_bool();
+        (minimized, minimized && ShowWindowAsync(h, SW_RESTORE).as_bool())
+    };
+    match way(minimized, taken) {
+        Way::AltTab => unsafe { windows::Win32::UI::WindowsAndMessaging::SwitchToThisWindow(h, true) },
+        Way::Front => crate::window::bring_to_front(hwnd),
     }
-    crate::window::bring_to_front(hwnd);
 }
 
 /// Minimises a task window, without waiting for it.
@@ -184,6 +204,14 @@ mod tests {
     #[test]
     fn nothing_to_start_is_not_an_error() {
         assert!(perform(ClickAction::Start, None).is_ok());
+    }
+
+    #[test]
+    fn a_minimised_window_whose_restore_was_refused_is_switched_to_the_alt_tab_way() {
+        assert_eq!(way(true, false), Way::AltTab, "a program that runs as administrator refuses our restore");
+        assert_eq!(way(true, true), Way::Front, "the restore was taken: the usual calls follow");
+        assert_eq!(way(false, false), Way::Front, "not minimised: nothing was asked, nothing was refused");
+        assert_eq!(way(false, true), Way::Front);
     }
 
     #[test]

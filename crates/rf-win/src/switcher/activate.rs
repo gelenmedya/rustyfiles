@@ -7,7 +7,12 @@
 //!
 //! 1. the window is gone: stop (nothing to do, the switcher closes);
 //! 2. the window is minimized: restore it first, WITHOUT waiting for its thread (`ShowWindowAsync`: a window that hangs must not
-//!    hang the switcher), then wait up to 250 ms for it to stop being minimized (a minimized window cannot be brought forward);
+//!    hang the switcher), then wait up to 250 ms for it to stop being minimized (a minimized window cannot be brought forward).
+//!    When Windows REFUSES the restore, the window belongs to a program with more rights than ours (one that runs as administrator:
+//!    `ShowWindowAsync` answers false, error 5). Then the way Alt+Tab itself switches is used (`SwitchToThisWindow`), which the
+//!    window manager carries out itself and which restores the window. Measured on the user's PC, 2026-11-14, on a minimised window
+//!    of a program running as administrator: the restore was refused and the window stayed minimised; `SwitchToThisWindow` restored
+//!    it and put it in front. (The user: "docktaki bazı uygulamalara tıklayınca öne gelmiyorlar.")
 //! 3. `SetForegroundWindow`; when the window (or its root owner) is in front now AND is not cloaked: done. A cloaked window can be
 //!    "the foreground window" without anything to be seen (the shell cloaks a suspended Store app and the leftover frame of a
 //!    closed one); the call is given a moment (UNCLOAK_WAIT_MS) to uncloak it, as it does a restored suspended app, and if the
@@ -24,8 +29,11 @@ pub trait ActivateOps {
     fn is_minimized(&mut self, hwnd: isize) -> bool;
     /// Whether DWM cloaks the window (any of the cloak reasons): it is not on the screen, whatever else is true of it.
     fn is_cloaked(&mut self, hwnd: isize) -> bool;
-    /// Asks for the window to be restored, without waiting for it.
-    fn restore(&mut self, hwnd: isize);
+    /// Asks for the window to be restored, without waiting for it. False: Windows refused (the window is a program's that runs with
+    /// more rights than ours).
+    fn restore(&mut self, hwnd: isize) -> bool;
+    /// Switches to the window the way Alt+Tab does (`SwitchToThisWindow`): for a window whose restore was refused.
+    fn switch_to(&mut self, hwnd: isize);
     fn sleep_ms(&mut self, ms: u64);
     /// `SetForegroundWindow`; the answer is the call's own.
     fn set_foreground(&mut self, hwnd: isize) -> bool;
@@ -78,7 +86,9 @@ pub fn activate(ops: &mut dyn ActivateOps, hwnd: isize) -> Outcome {
         return Outcome::Gone;
     }
     if ops.is_minimized(hwnd) {
-        ops.restore(hwnd);
+        if !ops.restore(hwnd) {
+            ops.switch_to(hwnd);
+        }
         let mut waited = 0;
         while ops.is_minimized(hwnd) && waited < RESTORE_WAIT_MS {
             ops.sleep_ms(RESTORE_POLL_MS);
@@ -113,11 +123,13 @@ impl ActivateOps for Win32Ops {
         unsafe { windows::Win32::UI::WindowsAndMessaging::IsIconic(h(hwnd)).as_bool() }
     }
 
-    fn restore(&mut self, hwnd: isize) {
+    fn restore(&mut self, hwnd: isize) -> bool {
         use windows::Win32::UI::WindowsAndMessaging::{SW_RESTORE, ShowWindowAsync};
-        unsafe {
-            let _ = ShowWindowAsync(h(hwnd), SW_RESTORE);
-        }
+        unsafe { ShowWindowAsync(h(hwnd), SW_RESTORE).as_bool() }
+    }
+
+    fn switch_to(&mut self, hwnd: isize) {
+        unsafe { windows::Win32::UI::WindowsAndMessaging::SwitchToThisWindow(h(hwnd), true) }
     }
 
     fn is_cloaked(&mut self, hwnd: isize) -> bool {
@@ -188,6 +200,8 @@ mod tests {
         plain_works: bool,
         /// Whether the attached route does.
         attached_works: bool,
+        /// Windows refuses the restore (a window of a program that runs as administrator).
+        restore_refused: bool,
         front: isize,
         root: isize,
     }
@@ -209,8 +223,15 @@ mod tests {
             self.calls.push(format!("cloaked? {yes}"));
             yes
         }
-        fn restore(&mut self, hwnd: isize) {
+        fn restore(&mut self, hwnd: isize) -> bool {
             self.calls.push(format!("restore {hwnd}"));
+            !self.restore_refused
+        }
+        fn switch_to(&mut self, hwnd: isize) {
+            self.calls.push(format!("switch_to {hwnd}"));
+            // (as measured: it restores the window and puts it in front)
+            self.minimized_answers = 0;
+            self.front = hwnd;
         }
         fn sleep_ms(&mut self, ms: u64) {
             self.calls.push(format!("sleep {ms}"));
@@ -243,6 +264,21 @@ mod tests {
 
     fn calls(f: &Fake) -> Vec<&str> {
         f.calls.iter().map(String::as_str).collect()
+    }
+
+    #[test]
+    fn a_minimised_window_whose_restore_is_refused_is_switched_to_as_alt_tab_does() {
+        // a window of a program that runs as administrator: minimised, and Windows refuses our restore
+        let mut f = Fake { exists: true, minimized_answers: usize::MAX, restore_refused: true, plain_works: true, ..Default::default() };
+        assert_eq!(activate(&mut f, 7), Outcome::Done);
+        let restore = f.calls.iter().position(|c| c == "restore 7").expect("the restore is asked first");
+        let switch = f.calls.iter().position(|c| c == "switch_to 7").expect("then the Alt+Tab way");
+        assert!(restore < switch);
+        assert!(!f.calls.iter().any(|c| c.starts_with("sleep")), "it was restored at once: nothing was waited for");
+        // a restore that is taken never uses that way
+        let mut g = Fake { exists: true, minimized_answers: 2, plain_works: true, ..Default::default() };
+        assert_eq!(activate(&mut g, 7), Outcome::Done);
+        assert!(!g.calls.iter().any(|c| c.starts_with("switch_to")));
     }
 
     #[test]
