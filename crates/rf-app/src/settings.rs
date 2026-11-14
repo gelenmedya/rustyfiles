@@ -77,6 +77,19 @@ pub enum DatePref {
     Universal,
 }
 
+/// The second pane of a tab in the saved session (issue 20: a window split in two came back with one pane, at the left pane's
+/// folder; only the left pane of each tab was written).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct SessionPane {
+    /// The tab it belongs to: an index into `session_tabs`.
+    pub tab: usize,
+    /// Where it was, written the way a tab of `session_tabs` is ("" = Home).
+    pub location: String,
+    /// It was the pane with the focus (the toolbar, the sidebar and the status bar acted on it).
+    pub active: bool,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum StartupPref {
@@ -379,6 +392,9 @@ pub struct Settings {
     /// Last session's tab locations ("" = Home).
     pub session_tabs: Vec<String>,
     pub session_active: usize,
+    /// The tabs of the last session that were split in two: the second pane of each (see [`SessionPane`]). A tab that is not named
+    /// here had one pane.
+    pub session_panes: Vec<SessionPane>,
     /// User pins. `None` = the default known folders.
     pub pinned: Option<Vec<PathBuf>>,
     /// Folder aliases: `@name` in the address box (Files' folder aliases).
@@ -658,6 +674,7 @@ impl Default for Settings {
             renderer: RendererPref::Auto,
             restore_session: true,
             session_tabs: Vec::new(),
+            session_panes: Vec::new(),
             session_active: 0,
             pinned: None,
             folder_aliases: Default::default(),
@@ -1158,6 +1175,22 @@ mod tests {
         let partial: Settings = toml::from_str("theme = \"dark\"").unwrap();
         assert_eq!(partial.theme, ThemePref::Dark);
         assert!(partial.restore_session);
+    }
+
+    /// The second panes of the session survive the settings file, and a file from before them has none.
+    #[test]
+    fn the_sessions_second_panes_survive_the_file() {
+        use super::SessionPane;
+        let panes = vec![SessionPane { tab: 0, location: "D:\\Yedek".into(), active: true }, SessionPane { tab: 2, location: String::new(), active: false }];
+        let s = Settings { session_tabs: vec!["C:\\".into(), "E:\\".into(), "F:\\".into()], session_panes: panes.clone(), ..Default::default() };
+        let back: Settings = toml::from_str(&toml::to_string_pretty(&s).unwrap()).unwrap();
+        assert_eq!(back.session_panes, panes);
+        assert_eq!(back.session_tabs.len(), 3);
+        let old: Settings = toml::from_str("session_tabs = [\"C:\\\\\"]").unwrap();
+        assert!(old.session_panes.is_empty());
+        // an entry that names only its tab reads with the rest at their defaults
+        let part: Settings = toml::from_str("[[session_panes]]\ntab = 1").unwrap();
+        assert_eq!(part.session_panes, [SessionPane { tab: 1, location: String::new(), active: false }]);
     }
 
     #[test]

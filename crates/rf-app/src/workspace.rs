@@ -306,6 +306,36 @@ fn session_text(loc: &Location) -> String {
     }
 }
 
+/// What the session keeps of the tabs: the left pane of each, and for the tabs that are split the right pane with whether it had
+/// the focus. `tabs` is each tab's left place and, when it is split, its right place and that flag.
+fn session_record(tabs: &[(Location, Option<(Location, bool)>)]) -> (Vec<String>, Vec<crate::settings::SessionPane>) {
+    let left = tabs.iter().map(|(l, _)| session_text(l)).collect();
+    let panes = tabs
+        .iter()
+        .enumerate()
+        .filter_map(|(tab, (_, right))| right.as_ref().map(|(loc, active)| crate::settings::SessionPane { tab, location: session_text(loc), active: *active }))
+        .collect();
+    (left, panes)
+}
+
+/// Where a place written by [`session_text`] leads back to.
+fn session_place(text: &str) -> Location {
+    if text.is_empty() { Location::Home } else { parse_launch(text).0 }
+}
+
+/// The second panes to open again when `tabs` tabs came back: for each tab that exists the first pane the record names for it (a
+/// record from a session with more tabs, or one edited by hand, must not open a pane for a tab that is not there or two for one).
+fn panes_to_restore(panes: &[crate::settings::SessionPane], tabs: usize) -> Vec<(usize, Location, bool)> {
+    let mut seen = std::collections::BTreeSet::new();
+    panes.iter().filter(|p| p.tab < tabs && seen.insert(p.tab)).map(|p| (p.tab, session_place(&p.location), p.active)).collect()
+}
+
+/// What tells that the session has to be written again: the places of all panes (not which pane has the focus: a click from one
+/// pane to the other is not worth a write of the settings file; the focus is written when the places change and at exit).
+fn session_key(left: &[String], panes: &[crate::settings::SessionPane]) -> Vec<String> {
+    left.iter().cloned().chain(panes.iter().map(|p| format!("\u{1}{}\u{1}{}", p.tab, p.location))).collect()
+}
+
 /// What a launch message opens: a folder (or Home), and maybe a name to select there.
 pub fn parse_launch(msg: &str) -> (Location, Option<String>) {
     let m = msg.trim();
@@ -685,8 +715,11 @@ impl Workspace {
             }
             None if prefs.startup == crate::settings::StartupPref::Continue && !prefs.session_tabs.is_empty() => {
                 for t in &prefs.session_tabs {
-                    let loc = if t.is_empty() { Location::Home } else { parse_launch(t).0 };
-                    this.open_tab(loc, window, cx);
+                    this.open_tab(session_place(t), window, cx);
+                }
+                // the tabs that were split in two get their second pane back, at its own folder and with the focus where it was
+                for (ix, loc, active) in panes_to_restore(&prefs.session_panes, this.tabs.len()) {
+                    this.open_second_pane(ix, loc, active, window, cx);
                 }
                 let a = prefs.session_active.min(this.tabs.len() - 1);
                 this.activate(a, window, cx);
@@ -770,14 +803,11 @@ impl Workspace {
             };
             [f32::from(b.origin.x), f32::from(b.origin.y), f32::from(b.size.width), f32::from(b.size.height), max]
         });
-        let tabs: Vec<String> = self
-            .tabs
-            .iter()
-            .map(|t| session_text(t.left.read(cx).location()))
-            .collect();
+        let (tabs, panes) = self.session_now(cx);
         let active = self.active;
         cx.update_global::<crate::settings::Settings, _>(|s, _| {
             s.session_tabs = tabs;
+            s.session_panes = panes;
             s.session_active = active;
             if placement.is_some() {
                 s.window = placement;
@@ -785,6 +815,25 @@ impl Workspace {
         });
         // synchronous: the process is about to exit
         cx.global::<crate::settings::Settings>().save();
+    }
+
+    /// The tabs as the session keeps them, now ([`session_record`]).
+    fn session_now(&self, cx: &App) -> (Vec<String>, Vec<crate::settings::SessionPane>) {
+        let tabs: Vec<(Location, Option<(Location, bool)>)> =
+            self.tabs.iter().map(|t| (t.left.read(cx).location().clone(), t.right.as_ref().map(|r| (r.read(cx).location().clone(), t.right_active)))).collect();
+        session_record(&tabs)
+    }
+
+    /// Gives tab `ix` its second pane at `loc` (a tab of the last session that was split); `active`: that pane has the focus.
+    fn open_second_pane(&mut self, ix: usize, loc: Location, active: bool, window: &mut Window, cx: &mut Context<Self>) {
+        if ix >= self.tabs.len() || self.tabs[ix].right.is_some() {
+            return;
+        }
+        let view = self.new_view(loc, window, cx);
+        view.update(cx, |v, _| v.dual = true);
+        self.tabs[ix].left.update(cx, |v, _| v.dual = true);
+        self.tabs[ix].right = Some(view);
+        self.tabs[ix].right_active = active;
     }
 
     fn active_tab(&self) -> &Entity<FolderView> {
@@ -3638,17 +3687,15 @@ impl Render for Workspace {
             self.last_title = title;
         }
         // Keep the saved session current (so it survives a crash or forced shutdown).
-        let session: Vec<String> = self
-            .tabs
-            .iter()
-            .map(|t| session_text(t.left.read(cx).location()))
-            .collect();
-        if session != self.last_session && self.picker.is_none() {
-            self.last_session = session.clone();
+        let (session, panes) = self.session_now(cx);
+        let key = session_key(&session, &panes);
+        if key != self.last_session && self.picker.is_none() {
+            self.last_session = key;
             let active = self.active;
             cx.defer(move |cx| {
                 cx.update_global::<crate::settings::Settings, _>(|s, _| {
                     s.session_tabs = session;
+                    s.session_panes = panes;
                     s.session_active = active;
                 });
                 let snapshot = cx.global::<crate::settings::Settings>().clone();
@@ -4051,6 +4098,37 @@ mod launch_tests {
         assert_eq!(sel.as_deref(), Some("rapor ü.txt"));
         assert_eq!(parse_launch(r"C:\Windows"), (Location::Path(PathBuf::from(r"C:\Windows")), None));
         assert_eq!(parse_launch("  "), (Location::Home, None));
+    }
+
+    /// Issue 20: a window split in two panes at different folders came back with one pane. The second pane of a tab is kept with its
+    /// own place and with whether it had the focus, and comes back for the tab it belonged to.
+    #[test]
+    fn the_second_pane_of_a_split_tab_comes_back_at_its_own_folder() {
+        use super::{panes_to_restore, session_key, session_record};
+        use crate::settings::SessionPane;
+        let p = |s: &str| Location::Path(PathBuf::from(s));
+        let tabs = vec![(p(r"C:\Work"), Some((p(r"D:\Backup"), true))), (p(r"C:\Users"), None), (Location::Home, Some((Location::RecycleBin, false)))];
+        let (left, panes) = session_record(&tabs);
+        assert_eq!(left, [r"C:\Work", r"C:\Users", ""]);
+        assert_eq!(
+            panes,
+            [SessionPane { tab: 0, location: r"D:\Backup".into(), active: true }, SessionPane { tab: 2, location: "shell:RecycleBinFolder".into(), active: false }]
+        );
+        assert_eq!(panes_to_restore(&panes, 3), [(0, p(r"D:\Backup"), true), (2, Location::RecycleBin, false)]);
+        // fewer tabs came back than the record knows (a tab's folder is gone, the list was edited): no pane for a tab that is not there
+        assert_eq!(panes_to_restore(&panes, 2), [(0, p(r"D:\Backup"), true)]);
+        // two entries for one tab: the first counts
+        let twice = [SessionPane { tab: 1, location: r"C:\a".into(), active: false }, SessionPane { tab: 1, location: r"C:\b".into(), active: true }];
+        assert_eq!(panes_to_restore(&twice, 2), [(1, p(r"C:\a"), false)]);
+        assert!(panes_to_restore(&[], 4).is_empty(), "a session from before this, or one with no split tab");
+        // the record is written again when a pane goes somewhere else or is opened or closed, not when only the focus moves
+        let moved = session_record(&[(p(r"C:\Work"), Some((p(r"E:\"), true)))]);
+        let focus = session_record(&[(p(r"C:\Work"), Some((p(r"D:\Backup"), false)))]);
+        let one = session_record(&[(p(r"C:\Work"), Some((p(r"D:\Backup"), true)))]);
+        let closed = session_record(&[(p(r"C:\Work"), None)]);
+        assert_ne!(session_key(&one.0, &one.1), session_key(&moved.0, &moved.1));
+        assert_ne!(session_key(&one.0, &one.1), session_key(&closed.0, &closed.1));
+        assert_eq!(session_key(&one.0, &one.1), session_key(&focus.0, &focus.1));
     }
 
     #[test]
