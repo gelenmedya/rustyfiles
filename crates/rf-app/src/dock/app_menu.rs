@@ -399,8 +399,10 @@ impl MenuView {
 
     /// About to be shown for this app: the fixed part, easing in.
     fn on_open(&mut self, app: DockApp, icon: Option<Arc<RenderImage>>, jump: JumpApp, _serial: u64, _window: &mut Window, cx: &mut Context<Self>) {
-        let fixed = model::fixed_rows(app.launch.is_some(), ownpins::pin_from_app(&app).is_some(), app.pinned, app.windows.len());
         let windows = winops::refs(&app.windows);
+        // (whether there is a process of the app's own to end: a few fast questions about its windows, none of which waits for it)
+        let can_end = !winops::end_task_processes(&windows).is_empty();
+        let fixed = model::fixed_rows(app.launch.is_some(), ownpins::pin_from_app(&app).is_some(), app.pinned, app.windows.len(), can_end);
         self.active = Some(Active { app, windows, jump, icon, display_name: None, menu: Menu::new(fixed), sections: Vec::new() });
         self.shown = true;
         self.closing = false;
@@ -553,6 +555,15 @@ impl MenuView {
                     winops::close_window(*w);
                 }
             }
+            RowId::Fixed(Fixed::EndTask) => {
+                // The user chose "end task": the app's processes are ended without being asked (off the UI thread; the windows are
+                // checked again there, so a handle that went to another program meanwhile ends nothing).
+                let (windows, name) = (a.windows.clone(), a.app.name.clone());
+                std::thread::spawn(move || {
+                    let (ended, refused) = winops::end_task(&windows);
+                    log::info!("dock: end task for {name:?}: {ended} process(es) ended, {refused} refused");
+                });
+            }
         }
         self.closing = true;
         cx.defer(|cx| close(CloseCause::Chosen, cx));
@@ -674,6 +685,7 @@ fn fixed_label(f: Fixed, app_name: &str) -> (Option<L>, String) {
         Fixed::Unpin => (Some(L::PinOff), t!("Dock'tan kaldır").to_string()),
         Fixed::CloseWindow => (Some(L::X), t!("Pencereyi kapat").to_string()),
         Fixed::CloseAll(n) => (Some(L::X), format!("{} ({n})", t!("Tüm pencereleri kapat"))),
+        Fixed::EndTask => (Some(L::CircleSlash), t!("Görevi sonlandır").to_string()),
     }
 }
 
@@ -774,6 +786,7 @@ mod tests {
         assert_eq!(fixed_label(Fixed::Unpin, "x").1, "Dock'tan kaldır");
         assert_eq!(fixed_label(Fixed::CloseWindow, "x").1, "Pencereyi kapat");
         assert_eq!(fixed_label(Fixed::CloseAll(3), "x").1, "Tüm pencereleri kapat (3)");
+        assert_eq!(fixed_label(Fixed::EndTask, "x").1, "Görevi sonlandır");
     }
 
     #[test]

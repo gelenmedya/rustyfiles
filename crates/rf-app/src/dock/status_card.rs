@@ -23,6 +23,7 @@ pub fn name(which: Status) -> &'static str {
     match which {
         Status::Eject => t!("Güvenli kaldırma"),
         Status::Security => t!("Windows Güvenliği"),
+        Status::Language => t!("Giriş dili"),
         Status::Network => t!("Ağ"),
         Status::Volume => t!("Ses"),
     }
@@ -34,13 +35,16 @@ pub fn icon(which: Status) -> L {
     match which {
         Status::Eject => L::Eject,
         Status::Security => L::ShieldCheck,
+        Status::Language => L::Languages,
         Status::Network => L::Wifi,
         Status::Volume => L::Volume2,
     }
 }
 
-fn desc() -> &'static str {
-    t!("Sağ adanın kendi simgelerinin sırası ve hangilerinin görüneceği. Listede üstte olan solda durur. Sırayı oklarla, satırı sürükleyerek ya da simgeyi Dock'un üzerinde sürükleyerek değiştirebilirsiniz. Güvenli kaldırma simgesi yalnızca çıkarılabilir bir sürücü takılıyken görünür.")
+/// What the card says under its title. (The sentence about the input language is a text of its own: it came later, and the first
+/// one keeps its translations.)
+fn desc() -> String {
+    format!("{} {}", t!("Sağ adanın kendi simgelerinin sırası ve hangilerinin görüneceği. Listede üstte olan solda durur. Sırayı oklarla, satırı sürükleyerek ya da simgeyi Dock'un üzerinde sürükleyerek değiştirebilirsiniz. Güvenli kaldırma simgesi yalnızca çıkarılabilir bir sürücü takılıyken görünür."), t!("Giriş dili simgesi yalnızca birden fazla klavye düzeni varken görünür."))
 }
 
 /// A row of the list while it is dragged: which button, the row it came from, and its name (the picture that follows the pointer).

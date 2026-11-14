@@ -6,9 +6,10 @@
 //! was taken; acting on a bare handle could then close a window of another program. An action therefore checks, at the moment it is
 //! asked for, that the handle still belongs to the same process (and is still a visible window) before it does anything.
 
-use windows::Win32::Foundation::{HWND, LPARAM, WPARAM};
+use windows::Win32::Foundation::{CloseHandle, HWND, LPARAM, WPARAM};
+use windows::Win32::System::Threading::{GetCurrentProcessId, OpenProcess, PROCESS_TERMINATE, TerminateProcess};
 use windows::Win32::UI::WindowsAndMessaging::{
-    GetWindowTextW, GetWindowThreadProcessId, IsIconic, IsWindow, IsWindowVisible, PostMessageW, SC_CLOSE, WM_SYSCOMMAND,
+    FindWindowExW, GetClassNameW, GetShellWindow, GetWindowTextW, GetWindowThreadProcessId, IsIconic, IsWindow, IsWindowVisible, PostMessageW, SC_CLOSE, WM_SYSCOMMAND,
 };
 
 fn h(hwnd: isize) -> HWND {
@@ -107,6 +108,108 @@ pub fn close_window(w: WinRef) -> bool {
     close_window_with(&Win32, w)
 }
 
+// ---------------------------------------------------------------- end task
+
+/// The window class of the frame Windows puts around every packaged (Store) app's own window. All such frames belong to ONE
+/// process (ApplicationFrameHost): ending it would end every Store app at once.
+const FRAME_CLASS: &str = "ApplicationFrameWindow";
+/// The app's own window inside such a frame.
+const CORE_CLASS: &str = "Windows.UI.Core.CoreWindow";
+
+/// What a window says about the process behind it, for "end task".
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct TaskOwner {
+    /// The process the window belongs to.
+    pub pid: u32,
+    /// The window is a packaged app's frame (it belongs to the host of all such apps, not to the app).
+    pub frame: bool,
+    /// For a frame: the process of the app's own window inside it, when there is one (a suspended app's window is not there).
+    pub inner: Option<u32>,
+}
+
+impl TaskOwner {
+    /// The app's own process: the window's, and for a Store app's frame the process of the window inside it (never the host of all
+    /// frames; `None` while there is nothing inside).
+    pub fn app_pid(&self) -> Option<u32> {
+        if self.frame { self.inner.filter(|&p| p != self.pid) } else { Some(self.pid) }
+    }
+}
+
+/// The processes "end task" ends for these windows (pure). Each once; a frame counts as the app inside it and never as the host;
+/// never this process, never the shell's (Explorer's windows belong to the process that is the desktop and the taskbar), never the
+/// system's two (0 and 4).
+pub fn end_targets(owners: &[TaskOwner], own: u32, shell: Option<u32>) -> Vec<u32> {
+    let mut out: Vec<u32> = Vec::new();
+    for o in owners {
+        if let Some(pid) = o.app_pid().filter(|&p| p > 4 && p != own && Some(p) != shell && !out.contains(&p)) {
+            out.push(pid);
+        }
+    }
+    out
+}
+
+fn class_of(hwnd: isize) -> String {
+    let mut buf = [0u16; 128];
+    let n = unsafe { GetClassNameW(h(hwnd), &mut buf) };
+    if n <= 0 { String::new() } else { String::from_utf16_lossy(&buf[..n as usize]) }
+}
+
+/// The process behind a window as the dock saw it; `None` when the handle is no longer that window.
+pub fn task_owner(w: WinRef) -> Option<TaskOwner> {
+    if !w.is_still() {
+        return None;
+    }
+    let frame = class_of(w.hwnd) == FRAME_CLASS;
+    let inner = frame
+        .then(|| {
+            let class = crate::wide::wide(CORE_CLASS);
+            let child = unsafe { FindWindowExW(Some(h(w.hwnd)), None, windows::core::PCWSTR(class.as_ptr()), None) }.ok()?;
+            let mut pid = 0u32;
+            unsafe { GetWindowThreadProcessId(child, Some(&mut pid)) };
+            (pid != 0).then_some(pid)
+        })
+        .flatten();
+    Some(TaskOwner { pid: w.pid, frame, inner })
+}
+
+/// The process of the shell's desktop window (Explorer's, while it is the shell); `None` when there is none.
+pub fn shell_pid() -> Option<u32> {
+    let shell = unsafe { GetShellWindow() };
+    if shell.0.is_null() {
+        return None;
+    }
+    let mut pid = 0u32;
+    unsafe { GetWindowThreadProcessId(shell, Some(&mut pid)) };
+    (pid != 0).then_some(pid)
+}
+
+/// The processes "end task" would end for these windows now ([`end_targets`], with this process and the shell left out).
+pub fn end_task_processes(windows: &[WinRef]) -> Vec<u32> {
+    let owners: Vec<TaskOwner> = windows.iter().filter_map(|w| task_owner(*w)).collect();
+    end_targets(&owners, unsafe { GetCurrentProcessId() }, shell_pid())
+}
+
+/// Ends the processes behind these windows, without asking them: what Windows' "End task" does, for a program that does not answer
+/// its close button. Unsaved work in them is lost; the user chose the row that says so. Returns how many were ended and how many
+/// could not be (a program running with administrator rights cannot be ended by this process).
+pub fn end_task(windows: &[WinRef]) -> (usize, usize) {
+    let (mut ended, mut refused) = (0, 0);
+    for pid in end_task_processes(windows) {
+        let ok = unsafe {
+            match OpenProcess(PROCESS_TERMINATE, false, pid) {
+                Ok(handle) => {
+                    let ok = TerminateProcess(handle, 1).is_ok();
+                    let _ = CloseHandle(handle);
+                    ok
+                }
+                Err(_) => false,
+            }
+        };
+        if ok { ended += 1 } else { refused += 1 }
+    }
+    (ended, refused)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -133,6 +236,32 @@ mod tests {
 
     fn fake(windows: Vec<(isize, u32, bool)>) -> Fake {
         Fake { windows, posted: RefCell::new(Vec::new()) }
+    }
+
+    #[test]
+    fn end_task_ends_the_apps_own_processes_and_never_the_shell_the_host_or_itself() {
+        let own = 500;
+        let shell = Some(600);
+        let plain = |pid| TaskOwner { pid, frame: false, inner: None };
+        // two windows of one process, one of another: each process once, in the windows' order
+        assert_eq!(end_targets(&[plain(10), plain(10), plain(11)], own, shell), [10, 11]);
+        // Explorer's folder windows belong to the shell's process; the dock's own process is never a target; nor are 0 and 4
+        assert_eq!(end_targets(&[plain(600), plain(500), plain(0), plain(4), plain(12)], own, shell), [12]);
+        assert_eq!(end_targets(&[plain(600)], own, None), [600], "with no shell window there is nothing to protect");
+        // a Store app: the app inside the frame, never the host of all frames
+        let frame = |inner| TaskOwner { pid: 77, frame: true, inner };
+        assert_eq!(end_targets(&[frame(Some(90))], own, shell), [90]);
+        assert!(end_targets(&[frame(None)], own, shell).is_empty(), "a suspended app has no window inside: nothing is ended");
+        assert!(end_targets(&[frame(Some(77))], own, shell).is_empty(), "the host named as its own inside is still the host");
+        assert_eq!(end_targets(&[frame(Some(90)), frame(Some(91)), plain(77)], own, shell), [90, 91, 77], "the host itself only when a plain window of it is asked for");
+        assert!(end_targets(&[], own, shell).is_empty());
+    }
+
+    #[test]
+    fn nothing_is_ended_for_a_handle_that_is_no_window() {
+        assert_eq!(task_owner(WinRef { hwnd: 0x7FFF_FFF1, pid: 1 }), None);
+        assert!(end_task_processes(&[WinRef { hwnd: 0x7FFF_FFF1, pid: 1 }, WinRef { hwnd: 0, pid: 2 }]).is_empty());
+        assert_eq!(end_task(&[WinRef { hwnd: 0x7FFF_FFF1, pid: 1 }]), (0, 0));
     }
 
     #[test]

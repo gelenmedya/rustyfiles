@@ -57,23 +57,57 @@ fn main() {
     println!("== DRY-RUN SEEDING: {} pins copied; {found} of {pinned} pinned apps found again; {false_hits} unpinned apps wrongly found", seeded.pins.len());
 
     // the fixed rows of every app's menu
-    let (mut open, mut pin, mut unpin, mut close_one, mut close_all, mut nothing_to_pin) = (0, 0, 0, 0, 0, 0);
+    let (mut open, mut pin, mut unpin, mut close_one, mut close_all, mut end, mut nothing_to_pin) = (0, 0, 0, 0, 0, 0, 0);
+    // what "end task" would end for each running app (read here, never done): the processes behind its windows
+    let mut end_lines: Vec<String> = Vec::new();
     for a in &apps {
         let can_pin = ownpins::pin_from_app(a).is_some();
         if !can_pin && !a.pinned {
             nothing_to_pin += 1;
         }
-        for row in appmenu::fixed_rows(a.launch.is_some(), can_pin, a.pinned, a.windows.len()) {
+        let targets = rf_win::dock::winops::end_task_processes(&rf_win::dock::winops::refs(&a.windows));
+        if a.running() {
+            end_lines.push(format!("   {:<28} {} window(s) -> {}", a.name.chars().take(28).collect::<String>(), a.windows.len(), if targets.is_empty() { "no row (the shell's, or a frame with nothing inside)".to_string() } else { format!("{} process(es): {targets:?}", targets.len()) }));
+        }
+        for row in appmenu::fixed_rows(a.launch.is_some(), can_pin, a.pinned, a.windows.len(), !targets.is_empty()) {
             match row {
                 Fixed::Open => open += 1,
                 Fixed::Pin => pin += 1,
                 Fixed::Unpin => unpin += 1,
                 Fixed::CloseWindow => close_one += 1,
                 Fixed::CloseAll(_) => close_all += 1,
+                Fixed::EndTask => end += 1,
             }
         }
     }
-    println!("== APP MENUS: rows over all apps: name {open}, pin {pin}, unpin {unpin}, close one window {close_one}, close all {close_all}; apps that cannot be pinned: {nothing_to_pin}");
+    println!("== APP MENUS: rows over all apps: name {open}, pin {pin}, unpin {unpin}, close one window {close_one}, close all {close_all}, end task {end}; apps that cannot be pinned: {nothing_to_pin}");
+    println!("== END TASK would end (nothing is ended by this probe):");
+    for l in &end_lines {
+        println!("{l}");
+    }
+
+    // each running app's own sound level, as the wheel over its icon would find it (read only)
+    let all: Vec<isize> = apps.iter().flat_map(|a| a.windows.iter().copied()).collect();
+    println!("== APP SOUND (read only; the wheel's lines per notch: {}):", rf_win::appvolume::wheel_lines());
+    for a in apps.iter().filter(|a| a.running()) {
+        let t = Instant::now();
+        let (n, level) = rf_win::appvolume::read(&a.windows, &all);
+        let name: String = a.name.chars().take(28).collect();
+        match level {
+            Some(l) => println!("   {name:<28} {n} session(s), {} %{}  ({:?})", l.percent(), if l.muted { ", muted" } else { "" }, t.elapsed()),
+            None => println!("   {name:<28} no sound session  ({:?})", t.elapsed()),
+        }
+    }
+
+    for (pid, owner, level) in rf_win::appvolume::probe(&all) {
+        let exe = |p: u32| rf_win::tasklist::process_exe_path(p).and_then(|e| e.file_name().map(|n| n.to_string_lossy().into_owned())).unwrap_or_else(|| "?".into());
+        println!("   session of {pid} ({}) -> {} : {}", exe(pid), owner.map_or("nobody".to_string(), |o| format!("{o} ({})", exe(o))), level.map_or("?".to_string(), |l| format!("{} %", l.percent())));
+    }
+
+    // the input language (read only)
+    let layouts = rf_win::inputlang::layouts();
+    let now = rf_win::inputlang::current();
+    println!("== INPUT LANGUAGE: {} layout(s): {:?}; the window in front types in {:?}", layouts.len(), layouts.iter().map(|l| rf_win::inputlang::code(*l)).collect::<Vec<_>>(), now.code);
 
     // the windows the previews would show
     let t = Instant::now();

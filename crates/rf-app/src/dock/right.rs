@@ -55,6 +55,9 @@ pub struct RightIsland {
     drives_read: bool,
     /// One of the island's own buttons is held, or dragged to another place.
     status_press: Option<StatusPress>,
+    /// The input language of the window in front and how many keyboard layouts the user has (`rf_win::inputlang`; the primary
+    /// monitor's island reads it). The button is there with two layouts or more.
+    lang: rf_win::inputlang::Current,
 }
 
 /// A button held on one of the island's own buttons, from the press to the release.
@@ -71,6 +74,14 @@ const STATUS_POLL: Duration = Duration::from_millis(16);
 
 /// How often the removable drives are looked at (off the UI thread: a few system calls).
 const DRIVES_EVERY: Duration = Duration::from_secs(3);
+
+/// How often the input language of the window in front is looked at while the user has more than one keyboard layout (off the UI
+/// thread: three system calls; the island hears of it only when it changed).
+const LANG_EVERY: Duration = Duration::from_millis(350);
+/// The same with one layout: only whether a second one was added.
+const LANG_IDLE: Duration = Duration::from_secs(5);
+/// The longest the worker looks without telling the island anything (the island may be gone: then the looking ends).
+const LANG_ROUND: Duration = Duration::from_secs(10);
 
 impl RightIsland {
     pub fn new(glass: Rc<RefCell<IslandGlass>>, mon: MonId, lines: ClockLines, content: Content, cx: &mut Context<Self>) -> Self {
@@ -101,8 +112,48 @@ impl RightIsland {
                 }
             })
             .detach();
+            // The input language of the window in front (issue 21: "i don't see language switcher icon"). Read on a worker, which
+            // comes back when it changed (or after a while, so that the looking ends with the island).
+            cx.spawn(async move |this, cx| {
+                let mut last = rf_win::inputlang::Current::default();
+                loop {
+                    let (prev, timers) = (last.clone(), cx.background_executor().clone());
+                    let now = cx
+                        .background_executor()
+                        .spawn(async move {
+                            let began = std::time::Instant::now();
+                            loop {
+                                let now = read_language();
+                                // (no window in front for a moment is not a change of language)
+                                let same = now.layouts == prev.layouts && (now.code == prev.code || now.code.is_empty());
+                                if !same || began.elapsed() >= LANG_ROUND {
+                                    return now;
+                                }
+                                timers.timer(if now.layouts >= 2 { LANG_EVERY } else { LANG_IDLE }).await;
+                            }
+                        })
+                        .await;
+                    let Ok(kept) = this.update(cx, |me, cx| me.set_language(now, cx)) else { break };
+                    last = kept;
+                }
+            })
+            .detach();
         }
-        RightIsland { glass, mon, content, lines, reported, tray_extra: 0.0, focus: None, drives_read: false, status_press: None }
+        RightIsland { glass, mon, content, lines, reported, tray_extra: 0.0, focus: None, drives_read: false, status_press: None, lang: Default::default() }
+    }
+
+    /// The input language was read: the button follows it. A reading without a window in front keeps the name that was shown.
+    /// Returns what the island now holds.
+    fn set_language(&mut self, mut now: rf_win::inputlang::Current, cx: &mut Context<Self>) -> rf_win::inputlang::Current {
+        if now.code.is_empty() && now.layouts >= 2 {
+            now.code = self.lang.code.clone();
+        }
+        if now != self.lang {
+            self.lang = now;
+            // (the button comes and goes with the second layout: the island's width follows, as with the drives)
+            self.drives_changed(cx);
+        }
+        self.lang.clone()
     }
 
     /// The island's own buttons to draw now, in the user's order and without the ones the user hid (the settings `dock_status_order`
@@ -112,10 +163,10 @@ impl RightIsland {
         if !self.mon.is_home() {
             return Vec::new();
         }
-        let removable = !super::eject_view::drives(cx).is_empty();
+        let (removable, languages) = (!super::eject_view::drives(cx).is_empty(), self.lang.layouts >= 2);
         match cx.try_global::<crate::settings::Settings>() {
-            Some(s) => status_order::shown(&s.dock_status_order, &s.dock_status_hidden, removable),
-            None => status_order::shown(&[], &[], removable),
+            Some(s) => status_order::shown(&s.dock_status_order, &s.dock_status_hidden, removable, languages),
+            None => status_order::shown(&[], &[], removable, languages),
         }
     }
 
@@ -290,11 +341,18 @@ impl RightIsland {
 }
 
 /// What a click on one of the island's own buttons does: safe removal opens our own panel with the drives, Windows Security opens
-/// that app, the network and the volume symbol open the control centre.
+/// that app, the input language asks the window in front for the next keyboard layout (the island does not take the focus, so the
+/// window the user types in is still in front; the button shows the new language when the window has changed it), the network and the
+/// volume symbol open the control centre.
 fn run_status(which: Status, cx: &mut App) {
     match which {
         Status::Eject => super::panel::toggle_eject(cx),
         Status::Security => super::panel_parts::open_uri("windowsdefender:"),
+        Status::Language => {
+            if !rf_win::inputlang::switch_foreground_to_next() {
+                log::info!("dock: the input language was not switched (no window in front, or one layout)");
+            }
+        }
         Status::Network | Status::Volume => open_controls(cx),
     }
 }
@@ -315,6 +373,41 @@ fn icon_button(id: &'static str, icon: L, pal: Palette, k: f32) -> impl IntoElem
         .hover(move |s| s.bg(hover))
         .active(move |s| s.bg(pressed))
         .child(Icon::new(icon).size(px(16. * k)).text_color(pal.text().hsla()))
+}
+
+/// The input language as the island reads it. `RUSTYFILES_DOCK_LANG=ENG` stands in for a second keyboard layout on a PC that has one,
+/// so that the button can be looked at there (a developer's switch: a click still asks the window in front, which then has nothing
+/// to switch to).
+fn read_language() -> rf_win::inputlang::Current {
+    match std::env::var("RUSTYFILES_DOCK_LANG") {
+        Ok(code) if !code.trim().is_empty() => rf_win::inputlang::Current { layouts: 2, code: rf_win::inputlang::short_code(&code, "") },
+        _ => rf_win::inputlang::current(),
+    }
+}
+
+/// The input-language button: the language's short name ("TUR", "ENG") in a button of the others' size, as Windows' taskbar writes it.
+/// Before the first reading with a window in front there is no name yet: the symbol stands in.
+fn lang_button(code: &str, pal: Palette, k: f32) -> gpui::AnyElement {
+    if code.is_empty() {
+        return icon_button("dock-language", L::Languages, pal, k).into_any_element();
+    }
+    let (hover, pressed) = (pal.hover_fill().hsla(), pal.press_plate().hsla());
+    div()
+        .id("dock-language")
+        .size(px(plan::BUTTON * k))
+        .flex()
+        .items_center()
+        .justify_center()
+        .rounded(px(8. * k))
+        .cursor_pointer()
+        .hover(move |s| s.bg(hover))
+        .active(move |s| s.bg(pressed))
+        .text_size(px(11. * k))
+        .line_height(px(14. * k))
+        .font_weight(gpui::FontWeight::SEMIBOLD)
+        .text_color(pal.text().hsla())
+        .child(SharedString::from(code.to_string()))
+        .into_any_element()
 }
 
 /// Whether the symbols open our own control centre (the setting "rustyfiles denetim merkezini kullan"; on by default).
@@ -433,6 +526,7 @@ impl Render for RightIsland {
                 let button = match which {
                     Status::Eject => icon_button("dock-eject", L::Eject, pal, k).into_any_element(),
                     Status::Security => icon_button("dock-security", L::ShieldCheck, pal, k).into_any_element(),
+                    Status::Language => lang_button(&self.lang.code, pal, k),
                     Status::Network => icon_button("dock-network", network_icon, pal, k).into_any_element(),
                     Status::Volume => icon_button("dock-volume", volume_icon, pal, k).into_any_element(),
                 };

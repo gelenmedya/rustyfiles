@@ -4,6 +4,7 @@
 
 pub mod accent;
 pub mod activate;
+pub mod appvolume;
 pub mod apppkg;
 pub mod apps;
 pub mod apps_direct;
@@ -35,6 +36,7 @@ pub mod glass;
 pub mod hotkey;
 pub mod hash;
 pub mod indexer;
+pub mod inputlang;
 pub mod known;
 pub mod libraries;
 pub mod ftp;

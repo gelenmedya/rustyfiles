@@ -207,6 +207,16 @@ pub(crate) fn entries() -> Vec<Entry> {
             Some(t!("Fare dock'un üzerindeyken simgeler Mac'teki gibi büyür: Hafif 1,25 katına, Tam 1,55 katına kadar.")),
             Control::Magnify(|s| s.dock_magnify, |s, v| s.dock_magnify = v),
         ),
+        e(
+            "dock-scroll-volume",
+            "dock_scroll_volume",
+            General,
+            dock,
+            L::Volume1,
+            t!("Simge üzerinde kaydırarak uygulamanın sesini ayarla"),
+            Some(t!("Çalışan bir uygulamanın Dock simgesi üzerinde fare tekerleğini çevirmek yalnızca o uygulamanın sesini açar ya da kısar; düzey simgenin üzerinde kısa süre gösterilir. Henüz ses çalmamış bir uygulamada değişen bir şey olmaz.")),
+            Control::Switch(|s| s.dock_scroll_volume, |s, v| s.dock_scroll_volume = v),
+        ),
         // (the name of the setting is still `dock_start_grow`: it was the Start panel's, and now every panel's)
         e(
             "dock-start-grow",
@@ -619,7 +629,7 @@ mod tests {
         assert_eq!(secs, Section::ALL.to_vec(), "an empty section would be a heading with nothing under it");
         // the sections hold what the page promises
         let ids = |sec: Section| g.iter().find(|(s, _)| *s == sec).map(|(_, v)| v.iter().map(|e| e.field).collect::<Vec<_>>()).unwrap();
-        assert_eq!(ids(Section::General), ["dock_enabled", "dock_reserve", "dock_size", "dock_side_tall", "dock_all_monitors", "dock_magnify", "dock_start_grow"]);
+        assert_eq!(ids(Section::General), ["dock_enabled", "dock_reserve", "dock_size", "dock_side_tall", "dock_all_monitors", "dock_magnify", "dock_scroll_volume", "dock_start_grow"]);
         assert_eq!(ids(Section::Left), ["dock_own_start", "dock_start_recommended", "dock_weather_city"]);
         assert_eq!(ids(Section::Middle), ["dock_hover_previews", "dock_app_menu", "dock_thin_when_maximized", "dock_apps_where"]);
         assert_eq!(ids(Section::Right), ["dock_own_control_centre", "dock_own_calendar", "dock_own_notifications"]);

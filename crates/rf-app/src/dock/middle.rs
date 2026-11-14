@@ -31,6 +31,8 @@ use std::rc::Rc;
 use std::time::{Duration, Instant};
 
 use gpui_kit::prelude::FluentBuilder as _;
+use gpui_kit::assets::IconName as L;
+use gpui_kit::component::Icon;
 use gpui_kit::*;
 use rf_win::dock::hover::Slot;
 use rf_win::dock::layout::{ICON_REST, MIDDLE_HEIGHT, RADIUS};
@@ -62,6 +64,36 @@ const PINS_EVERY: Duration = Duration::from_secs(20);
 /// How much of an icon's width is taken off each side while a button is down on it, and how opaque it is then.
 const PRESS_DIP: f32 = 0.07;
 const PRESS_DIM: f32 = 0.78;
+/// How long an app's sound level stays on its icon after the wheel was turned over it.
+const VOL_HUD_FOR: Duration = Duration::from_millis(1300);
+/// A wheel event that comes in pixels (a touchpad): this many are a line.
+const WHEEL_PX_PER_LINE: f32 = 16.0;
+
+/// A sound level shown on an app's icon: the app, its level after the wheel (`None`: it has no sound to turn), and which showing it is.
+#[derive(Clone, Debug, PartialEq)]
+struct VolHud {
+    key: String,
+    level: Option<rf_win::appvolume::Level>,
+    serial: u64,
+}
+
+/// What the icon shows for a level: the symbol, the number, and how much of the bar is filled. An app without a sound session gets the
+/// crossed-out speaker and a dash: the wheel was heard, and there is nothing to turn.
+fn vol_hud_look(level: Option<rf_win::appvolume::Level>) -> (L, String, f32) {
+    match level {
+        None => (L::VolumeOff, "\u{2013}".to_string(), 0.0),
+        Some(l) => {
+            let p = l.percent();
+            let glyph = match (l.muted, p) {
+                (true, _) => L::VolumeX,
+                (false, 0) => L::Volume,
+                (false, 1..=49) => L::Volume1,
+                _ => L::Volume2,
+            };
+            (glyph, p.to_string(), if l.muted { 0.0 } else { p as f32 / 100.0 })
+        }
+    }
+}
 
 pub struct MiddleIsland {
     glass: Rc<RefCell<IslandGlass>>,
@@ -108,6 +140,12 @@ pub struct MiddleIsland {
     /// (a preview opens 400 ms after the pointer came, when the bell is still easing in, and the pointer then goes into the preview, so
     /// the bell shrinks away).
     hover_ix: Option<usize>,
+    /// The sound level the wheel last set for an app, drawn on its icon for a moment.
+    vol_hud: Option<VolHud>,
+    /// The part of a notch the wheel has turned so far, and the app it was turned over (a fine wheel gives parts of a notch).
+    vol_rest: (String, f32),
+    /// Counts the showings of a level: the timer that ends one ends only its own.
+    vol_serial: u64,
     rest_items: Vec<(f32, f32)>,
     /// The glass and the icons' boxes as they were drawn last (dock units, the window's coordinates): what a right click is told
     /// "empty glass" or "an icon" by.
@@ -197,6 +235,9 @@ impl MiddleIsland {
             refreshing: false,
             dirty: false,
             hover_ix: None,
+            vol_hud: None,
+            vol_rest: (String::new(), 0.0),
+            vol_serial: 0,
             rest_items: Vec::new(),
             last_glass: [0.0; 4],
             last_icons: Vec::new(),
@@ -552,6 +593,58 @@ impl MiddleIsland {
         let &(x, w) = self.rest_items.get(ix)?;
         let glass = host::visible_glass_rect_on(self.mon, Kind::Middle, cx)?;
         Some(screen_center_x(glass.left, x, w, host::env_on(self.mon, cx).unit()))
+    }
+
+    /// The wheel was turned over item `ix`: a running app's own sound level goes a step up or down for each notch (issue 21: "control
+    /// volume level per app by scrolling over app icon"), and the icon shows the level for a moment. The level is the app's own, the one
+    /// Windows' volume mixer shows; the system's level is not touched. An app that has played nothing has no level: the icon says so and
+    /// nothing is changed. The audio service is asked on a worker (`rf_win::appvolume`: a few milliseconds).
+    fn item_scrolled(&mut self, ix: usize, ev: &ScrollEvent, cx: &mut Context<Self>) {
+        if self.drag.is_some() || !cx.try_global::<Settings>().is_none_or(|s| s.dock_scroll_volume) {
+            return;
+        }
+        let Some(DockItem::App(a)) = self.items.get(ix) else { return };
+        if !a.running() {
+            return;
+        }
+        let lines = match ev.delta {
+            ScrollDelta::Lines(p) => if p.y != 0.0 { p.y } else { p.x },
+            ScrollDelta::Pixels(p) => f32::from(p.y) / WHEEL_PX_PER_LINE,
+        };
+        if self.vol_rest.0 != a.key {
+            self.vol_rest = (a.key.clone(), 0.0);
+        }
+        let notches = rf_win::appvolume::take_notches(&mut self.vol_rest.1, rf_win::appvolume::notches_of_lines(lines, rf_win::appvolume::wheel_lines()));
+        if notches == 0 {
+            return;
+        }
+        let (key, mine) = (a.key.clone(), a.windows.clone());
+        // every window that has an icon on a dock (all monitors'): a sound belongs to the NEAREST process with a window
+        let mut all: Vec<isize> = self.last_groups.iter().flat_map(|(_, tasks)| tasks.iter().map(|t| t.hwnd)).collect();
+        all.extend(self.items.iter().filter_map(|i| if let DockItem::App(a) = i { Some(a.windows.iter().copied()) } else { None }).flatten());
+        cx.spawn(async move |this, cx| {
+            let level = cx.background_executor().spawn(async move { rf_win::appvolume::nudge(&mine, &all, notches) }).await;
+            let _ = this.update(cx, |me, cx| me.volume_shown(key, level, cx));
+        })
+        .detach();
+    }
+
+    /// An app's level was turned (or found to be none): its icon shows it until [`VOL_HUD_FOR`] after the last turn.
+    fn volume_shown(&mut self, key: String, level: Option<rf_win::appvolume::Level>, cx: &mut Context<Self>) {
+        self.vol_serial += 1;
+        let serial = self.vol_serial;
+        self.vol_hud = Some(VolHud { key, level, serial });
+        cx.notify();
+        cx.spawn(async move |this, cx| {
+            cx.background_executor().timer(VOL_HUD_FOR).await;
+            let _ = this.update(cx, |me, cx| {
+                if me.vol_hud.as_ref().is_some_and(|h| h.serial == serial) {
+                    me.vol_hud = None;
+                    cx.notify();
+                }
+            });
+        })
+        .detach();
     }
 
     /// The pointer came onto item `ix` (`on`) or left it: a running app's icon is what a preview belongs to.
@@ -1072,6 +1165,11 @@ impl Render for MiddleIsland {
                         DockItem::App(a) => (a.running(), a.active),
                         _ => (false, false),
                     };
+                    // the app's sound level, while the wheel has just been turned over this icon
+                    let hud = match (item, &self.vol_hud) {
+                        (DockItem::App(a), Some(h)) if h.key == a.key => Some(vol_hud_look(h.level)),
+                        _ => None,
+                    };
                     // (the pose is `draws`', worked out above: the region was made from it)
                     let picture = if grow == 0.0 && up == 0.0 && dx == 0.0 && opacity == 1.0 {
                         picture
@@ -1088,6 +1186,29 @@ impl Render for MiddleIsland {
                         .h(u(w))
                         .cursor_pointer()
                         .child(picture)
+                        // The sound level over the picture, inside the icon's own box (the window's shape is cut around the icons: nothing
+                        // may be drawn outside them): the symbol, the number and a thin bar, light on a dark plate in either theme.
+                        .when_some(hud, |d, (glyph, text, fill)| {
+                            let (plate, ink, track) = (gpui::hsla(0., 0., 0., 0.82), gpui::hsla(0., 0., 1., 1.), gpui::hsla(0., 0., 1., 0.28));
+                            let bar = w * 0.56;
+                            d.child(
+                                div()
+                                    .absolute()
+                                    .left(u(0.0))
+                                    .top(u(0.0))
+                                    .w(u(w))
+                                    .h(u(w))
+                                    .rounded(u(w * 0.24))
+                                    .bg(plate)
+                                    .flex()
+                                    .flex_col()
+                                    .items_center()
+                                    .justify_center()
+                                    .child(Icon::new(glyph).size(u(w * 0.34)).text_color(ink))
+                                    .child(div().text_size(u(w * 0.25)).line_height(u(w * 0.30)).font_weight(gpui::FontWeight::SEMIBOLD).text_color(ink).child(text))
+                                    .child(div().mt(u(w * 0.03)).w(u(bar)).h(u(w * 0.05)).rounded_full().bg(track).child(div().h_full().w(u(bar * fill)).rounded_full().bg(ink))),
+                            )
+                        })
                         // the running mark; under an app that is being started it is the starting mark, which pulses until the app has a window
                         .when(running || mark.is_some() || failed, |d| {
                             let wide = in_front && running;
@@ -1112,6 +1233,7 @@ impl Render for MiddleIsland {
                         .on_hover(cx.listener(move |me, on: &bool, _, cx| me.item_hover(ix, *on, cx)))
                         .on_mouse_up(MouseButton::Right, cx.listener(move |me, _, _, cx| me.right_click(ix, cx)))
                         .on_mouse_up(MouseButton::Middle, cx.listener(move |me, _, _, _| me.middle_click(ix)))
+                        .on_scroll(cx.listener(move |me, ev: &ScrollEvent, _, cx| me.item_scrolled(ix, ev, cx)))
                         .into_any_element()
                 }
             };
@@ -1182,7 +1304,25 @@ impl Render for MiddleIsland {
 
 #[cfg(test)]
 mod tests {
-    use super::{BASELINE, DOT_DROP, DockItem, ICON_REST, MIN_MOVE, Place, Slot, Task, icon_count, item_icons, look, magnify, model, move_needs_frame, plan};
+    use super::{BASELINE, L, vol_hud_look, DOT_DROP, DockItem, ICON_REST, MIN_MOVE, Place, Slot, Task, icon_count, item_icons, look, magnify, model, move_needs_frame, plan};
+
+    /// The level on an icon: the number the volume mixer shows, a symbol that follows it, and a bar; a muted app's bar is empty, and an
+    /// app with no sound says so without a number.
+    #[test]
+    fn the_icon_shows_the_level_it_was_turned_to() {
+        use rf_win::appvolume::Level;
+        let look = |volume: f32, muted: bool| vol_hud_look(Some(Level { volume, muted }));
+        let (glyph, text, fill) = look(0.65, false);
+        assert!(matches!(glyph, L::Volume2) && text == "65" && (fill - 0.65).abs() < 1e-6);
+        assert!(matches!(look(0.30, false).0, L::Volume1));
+        let (glyph, text, fill) = look(0.0, false);
+        assert!(matches!(glyph, L::Volume) && text == "0" && fill == 0.0);
+        let (glyph, text, fill) = look(0.40, true);
+        assert!(matches!(glyph, L::VolumeX) && text == "40" && fill == 0.0, "muted: the number stays, the bar is empty");
+        let (glyph, text, fill) = vol_hud_look(None);
+        assert!(matches!(glyph, L::VolumeOff) && text == "\u{2013}" && fill == 0.0);
+        assert_eq!(look(1.0, false).1, "100");
+    }
 
     #[test]
     fn a_pointer_move_draws_a_frame_only_when_something_could_look_different() {

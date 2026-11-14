@@ -1,10 +1,10 @@
-//! The right island's own status buttons (safe removal, Windows Security, network, volume): their order and which of them are shown.
-//! Pure: the saved lists in, the buttons to draw out.
+//! The right island's own status buttons (safe removal, Windows Security, the input language, network, volume): their order and
+//! which of them are shown. Pure: the saved lists in, the buttons to draw out.
 //!
 //! WHY (a user of 0.7.1, with a picture of the four symbols: "will be useful if we can swap icons here"). The order was fixed in the
-//! island's code. The programs' own tray icons beside them can already be dragged into another order (`tray_order.rs`); these four are
-//! the island's, so their order and their presence are two settings: `dock_status_order` and `dock_status_hidden`, lists of the keys
-//! below.
+//! island's code. The programs' own tray icons beside them can already be dragged into another order (`tray_order.rs`); these are the
+//! island's, so their order and their presence are two settings: `dock_status_order` and `dock_status_hidden`, lists of the keys
+//! below. (The input language joined them with issue 21: `rf_win::inputlang`.)
 //!
 //! TWO WAYS TO CHANGE THE ORDER: the arrows of the list in Settings ([`moved`]), and a drag of the button itself on the island (the
 //! user: "sıra değiştirme drag drop ile de olsun"), as the programs' tray icons beside them are dragged: [`drop_index`] says where the
@@ -20,19 +20,23 @@ pub enum Status {
     Eject,
     /// Windows Security.
     Security,
+    /// The input language of the window in front: there only while the user has more than one keyboard layout.
+    Language,
     Network,
     Volume,
 }
 
 impl Status {
-    /// The usual order (what the island had while the order was fixed).
-    pub const ALL: [Status; 4] = [Status::Eject, Status::Security, Status::Network, Status::Volume];
+    /// The usual order (what the island had while the order was fixed; the input language stands where Windows' own taskbar has it,
+    /// before the network symbol).
+    pub const ALL: [Status; 5] = [Status::Eject, Status::Security, Status::Language, Status::Network, Status::Volume];
 
     /// The name in the settings file.
     pub fn key(self) -> &'static str {
         match self {
             Status::Eject => "eject",
             Status::Security => "security",
+            Status::Language => "language",
             Status::Network => "network",
             Status::Volume => "volume",
         }
@@ -43,15 +47,15 @@ impl Status {
     }
 }
 
-/// All four buttons in the saved order, completed as the module says.
-pub fn order(saved: &[String]) -> [Status; 4] {
-    let mut out: Vec<Status> = Vec::with_capacity(4);
+/// All the buttons in the saved order, completed as the module says.
+pub fn order(saved: &[String]) -> [Status; 5] {
+    let mut out: Vec<Status> = Vec::with_capacity(5);
     for s in saved.iter().filter_map(|k| Status::from_key(k)).chain(Status::ALL) {
         if !out.contains(&s) {
             out.push(s);
         }
     }
-    [out[0], out[1], out[2], out[3]]
+    [out[0], out[1], out[2], out[3], out[4]]
 }
 
 /// Whether the settings hide this button.
@@ -60,9 +64,10 @@ pub fn is_hidden(hidden: &[String], which: Status) -> bool {
 }
 
 /// The buttons the island draws, in order: the saved order, less the hidden ones, less safe removal while there is nothing to remove
-/// (`removable`: a removable drive holds a volume).
-pub fn shown(saved: &[String], hidden: &[String], removable: bool) -> Vec<Status> {
-    order(saved).into_iter().filter(|s| !is_hidden(hidden, *s) && (*s != Status::Eject || removable)).collect()
+/// (`removable`: a removable drive holds a volume), less the input language while there is nothing to switch to (`languages`: the
+/// user has more than one keyboard layout).
+pub fn shown(saved: &[String], hidden: &[String], removable: bool, languages: bool) -> Vec<Status> {
+    order(saved).into_iter().filter(|s| !is_hidden(hidden, *s) && (*s != Status::Eject || removable) && (*s != Status::Language || languages)).collect()
 }
 
 /// The order to save after `which` was moved one place earlier (`by` -1) or later (+1). At an end it stays where it is.
@@ -75,7 +80,7 @@ pub fn moved(saved: &[String], which: Status, by: i32) -> Vec<String> {
     all.into_iter().map(|s| s.key().to_string()).collect()
 }
 
-/// The order to save after `which` was dragged onto the row of index `to` in the list of all four (Settings): it takes that place,
+/// The order to save after `which` was dragged onto the row of index `to` in the list of all the buttons (Settings): it takes that place,
 /// and the rows between move one place towards where it was. A drag onto its own row changes nothing.
 pub fn placed(saved: &[String], which: Status, to: usize) -> Vec<String> {
     let mut all: Vec<Status> = order(saved).into_iter().filter(|s| *s != which).collect();
@@ -134,53 +139,78 @@ mod tests {
         list.iter().map(|s| s.to_string()).collect()
     }
 
+    const E: Status = Status::Eject;
+    const S: Status = Status::Security;
+    const L: Status = Status::Language;
+    const N: Status = Status::Network;
+    const V: Status = Status::Volume;
+
     #[test]
-    fn with_nothing_saved_the_buttons_are_the_ones_the_island_always_had_in_their_order() {
+    fn with_nothing_saved_the_buttons_stand_in_the_usual_order() {
         assert_eq!(order(&[]), Status::ALL);
-        assert_eq!(shown(&[], &[], true), Status::ALL.to_vec());
-        // safe removal is there only while there is something to remove
-        assert_eq!(shown(&[], &[], false), [Status::Security, Status::Network, Status::Volume]);
+        assert_eq!(Status::ALL, [E, S, L, N, V]);
+        assert_eq!(shown(&[], &[], true, true), Status::ALL.to_vec());
+        // safe removal is there only while there is something to remove, the language only with more than one layout
+        assert_eq!(shown(&[], &[], false, true), [S, L, N, V]);
+        assert_eq!(shown(&[], &[], true, false), [E, S, N, V]);
+        assert_eq!(shown(&[], &[], false, false), [S, N, V], "what the island always had");
     }
 
     #[test]
     fn a_saved_order_is_followed_and_a_list_from_another_version_loses_no_button() {
-        assert_eq!(order(&keys(&["volume", "network", "security", "eject"])), [Status::Volume, Status::Network, Status::Security, Status::Eject]);
+        assert_eq!(order(&keys(&["volume", "network", "language", "security", "eject"])), [V, N, L, S, E]);
+        // a list from before the language button names four: the language follows them
+        assert_eq!(order(&keys(&["volume", "network", "security", "eject"])), [V, N, S, E, L]);
         // a list that names only some: the rest follow in the usual order
-        assert_eq!(order(&keys(&["volume"])), [Status::Volume, Status::Eject, Status::Security, Status::Network]);
+        assert_eq!(order(&keys(&["volume"])), [V, E, S, L, N]);
         // an unknown key (a later version's), a key named twice, spaces around a key
-        assert_eq!(order(&keys(&["bluetooth", "network", " volume ", "network"])), [Status::Network, Status::Volume, Status::Eject, Status::Security]);
+        assert_eq!(order(&keys(&["bluetooth", "network", " volume ", "network"])), [N, V, E, S, L]);
     }
 
     #[test]
     fn hidden_buttons_are_left_out_and_the_others_keep_their_order() {
-        let order_ = keys(&["volume", "security", "network", "eject"]);
-        assert_eq!(shown(&order_, &keys(&["security"]), true), [Status::Volume, Status::Network, Status::Eject]);
-        assert_eq!(shown(&order_, &keys(&["security", "nonsense", "volume"]), false), [Status::Network]);
-        // all four hidden: none (the island then has its clock and its bell)
-        assert!(shown(&order_, &keys(&["eject", "security", "network", "volume"]), true).is_empty());
-        assert!(is_hidden(&keys(&["volume"]), Status::Volume) && !is_hidden(&keys(&["volume"]), Status::Network));
+        let order_ = keys(&["volume", "security", "network", "eject", "language"]);
+        assert_eq!(shown(&order_, &keys(&["security"]), true, true), [V, N, E, L]);
+        assert_eq!(shown(&order_, &keys(&["security", "nonsense", "volume"]), false, false), [N]);
+        assert_eq!(shown(&order_, &keys(&["language"]), true, true), [V, S, N, E], "a hidden language button stays hidden with two layouts");
+        // all hidden: none (the island then has its clock and its bell)
+        assert!(shown(&order_, &keys(&["eject", "security", "network", "volume", "language"]), true, true).is_empty());
+        assert!(is_hidden(&keys(&["volume"]), V) && !is_hidden(&keys(&["volume"]), N));
     }
 
     #[test]
     fn a_button_moves_one_place_and_stays_at_an_end() {
-        assert_eq!(moved(&[], Status::Volume, -1), keys(&["eject", "security", "volume", "network"]));
-        assert_eq!(moved(&[], Status::Eject, 1), keys(&["security", "eject", "network", "volume"]));
-        assert_eq!(moved(&[], Status::Eject, -1), keys(&["eject", "security", "network", "volume"]), "the first stays first");
-        assert_eq!(moved(&[], Status::Volume, 1), keys(&["eject", "security", "network", "volume"]), "the last stays last");
-        // two moves bring the last to the second place; a big number is one step
-        let once = moved(&[], Status::Volume, -5);
-        assert_eq!(moved(&once, Status::Volume, -1), keys(&["eject", "volume", "security", "network"]));
+        assert_eq!(moved(&[], V, -1), keys(&["eject", "security", "language", "volume", "network"]));
+        assert_eq!(moved(&[], E, 1), keys(&["security", "eject", "language", "network", "volume"]));
+        assert_eq!(moved(&[], E, -1), keys(&["eject", "security", "language", "network", "volume"]), "the first stays first");
+        assert_eq!(moved(&[], V, 1), keys(&["eject", "security", "language", "network", "volume"]), "the last stays last");
+        // two moves bring the last two places up; a big number is one step
+        let once = moved(&[], V, -5);
+        assert_eq!(moved(&once, V, -1), keys(&["eject", "security", "volume", "language", "network"]));
         // a saved list with rubbish in it is written back clean and whole
-        assert_eq!(moved(&keys(&["x", "volume"]), Status::Security, 1), keys(&["volume", "eject", "network", "security"]));
+        assert_eq!(moved(&keys(&["x", "volume"]), S, 1), keys(&["volume", "eject", "language", "security", "network"]));
     }
 
     #[test]
     fn hiding_and_showing_write_a_clean_list() {
-        assert_eq!(with_hidden(&[], Status::Network, false), keys(&["network"]));
-        assert_eq!(with_hidden(&keys(&["network", "volume", "nonsense", "network"]), Status::Network, true), keys(&["volume"]));
-        assert_eq!(with_hidden(&keys(&["volume"]), Status::Eject, false), keys(&["eject", "volume"]));
-        assert!(with_hidden(&keys(&["volume"]), Status::Volume, true).is_empty());
-        assert_eq!(with_hidden(&keys(&["volume"]), Status::Volume, false), keys(&["volume"]), "hidden twice is hidden once");
+        assert_eq!(with_hidden(&[], N, false), keys(&["network"]));
+        assert_eq!(with_hidden(&keys(&["network", "volume", "nonsense", "network"]), N, true), keys(&["volume"]));
+        assert_eq!(with_hidden(&keys(&["volume"]), E, false), keys(&["eject", "volume"]));
+        assert_eq!(with_hidden(&keys(&["volume"]), L, false), keys(&["language", "volume"]), "in the usual order");
+        assert!(with_hidden(&keys(&["volume"]), V, true).is_empty());
+        assert_eq!(with_hidden(&keys(&["volume"]), V, false), keys(&["volume"]), "hidden twice is hidden once");
+    }
+
+    #[test]
+    fn a_row_dragged_onto_another_takes_its_place() {
+        // eject, security, language, network, volume
+        assert_eq!(placed(&[], V, 0), keys(&["volume", "eject", "security", "language", "network"]));
+        assert_eq!(placed(&[], E, 4), keys(&["security", "language", "network", "volume", "eject"]));
+        assert_eq!(placed(&[], E, 2), keys(&["security", "language", "eject", "network", "volume"]), "down: it stands where the row it was dropped on stood");
+        assert_eq!(placed(&[], V, 1), keys(&["eject", "volume", "security", "language", "network"]), "up: the same");
+        assert_eq!(placed(&[], N, 3), keys(&["eject", "security", "language", "network", "volume"]), "onto its own row: as it was");
+        assert_eq!(placed(&[], N, 99), keys(&["eject", "security", "language", "volume", "network"]), "past the end is the end");
+        assert_eq!(placed(&keys(&["x", "volume"]), E, 0), keys(&["eject", "volume", "security", "language", "network"]), "written back whole and clean");
     }
 
     #[test]
@@ -200,39 +230,38 @@ mod tests {
 
     #[test]
     fn a_dropped_button_stands_where_it_was_dropped_and_the_others_keep_their_order() {
-        let all = Status::ALL.to_vec(); // eject, security, network, volume
+        let all = Status::ALL.to_vec(); // eject, security, language, network, volume
         // the last to the front, the first to the end, one step to the right
-        assert_eq!(dropped(&[], &all, Status::Volume, 0), Some(keys(&["volume", "eject", "security", "network"])));
-        assert_eq!(dropped(&[], &all, Status::Eject, 4), Some(keys(&["security", "network", "volume", "eject"])));
-        assert_eq!(dropped(&[], &all, Status::Security, 3), Some(keys(&["eject", "network", "security", "volume"])));
+        assert_eq!(dropped(&[], &all, V, 0), Some(keys(&["volume", "eject", "security", "language", "network"])));
+        assert_eq!(dropped(&[], &all, E, 5), Some(keys(&["security", "language", "network", "volume", "eject"])));
+        assert_eq!(dropped(&[], &all, S, 3), Some(keys(&["eject", "language", "security", "network", "volume"])));
         // on its own place: nothing to save
-        assert_eq!(dropped(&[], &all, Status::Security, 1), None);
-        assert_eq!(dropped(&[], &all, Status::Security, 2), None);
+        assert_eq!(dropped(&[], &all, S, 1), None);
+        assert_eq!(dropped(&[], &all, S, 2), None);
         // a button that is not shown cannot be dropped
-        assert_eq!(dropped(&[], &[Status::Security, Status::Network, Status::Volume], Status::Eject, 0), None);
+        assert_eq!(dropped(&[], &[S, N, V], E, 0), None);
         // from a saved order
-        let saved = keys(&["volume", "network", "security", "eject"]);
-        let shown = [Status::Volume, Status::Network, Status::Security, Status::Eject];
-        assert_eq!(dropped(&saved, &shown, Status::Eject, 1), Some(keys(&["volume", "eject", "network", "security"])));
+        let saved = keys(&["volume", "network", "security", "eject", "language"]);
+        assert_eq!(dropped(&saved, &[V, N, S, E, L], E, 1), Some(keys(&["volume", "eject", "network", "security", "language"])));
     }
 
     #[test]
     fn buttons_that_are_not_shown_keep_their_places_when_another_is_dropped() {
-        // no removable drive: the island shows security, network, volume; safe removal stays first in the saved order
-        let shown = [Status::Security, Status::Network, Status::Volume];
-        assert_eq!(dropped(&[], &shown, Status::Volume, 0), Some(keys(&["eject", "volume", "security", "network"])));
-        assert_eq!(dropped(&[], &shown, Status::Security, 3), Some(keys(&["eject", "network", "volume", "security"])));
+        // no removable drive and one layout: the island shows security, network, volume; the other two keep their places in the list
+        let shown_ = [S, N, V];
+        assert_eq!(dropped(&[], &shown_, V, 0), Some(keys(&["eject", "volume", "security", "language", "network"])));
+        assert_eq!(dropped(&[], &shown_, S, 3), Some(keys(&["eject", "language", "network", "volume", "security"])));
         // security is hidden and stands between the two that are shown: network dropped after volume goes directly after volume
-        let shown = [Status::Network, Status::Volume];
-        let saved = keys(&["network", "security", "volume", "eject"]);
-        assert_eq!(dropped(&saved, &shown, Status::Network, 2), Some(keys(&["security", "volume", "network", "eject"])));
-        assert_eq!(dropped(&saved, &shown, Status::Volume, 0), Some(keys(&["volume", "network", "security", "eject"])));
-        // whatever is dropped where, the result names every button once
-        for which in shown {
-            for insert in 0..=shown.len() {
-                if let Some(new) = dropped(&saved, &shown, which, insert) {
+        let shown_ = [N, V];
+        let saved = keys(&["network", "security", "volume", "eject", "language"]);
+        assert_eq!(dropped(&saved, &shown_, N, 2), Some(keys(&["security", "volume", "network", "eject", "language"])));
+        assert_eq!(dropped(&saved, &shown_, V, 0), Some(keys(&["volume", "network", "security", "eject", "language"])));
+        // whatever is dropped where, the result names every button once and the dropped one stands where it was dropped
+        for which in shown_ {
+            for insert in 0..=shown_.len() {
+                if let Some(new) = dropped(&saved, &shown_, which, insert) {
                     assert_eq!(order(&new).map(|s| s.key().to_string()).to_vec(), new, "whole and clean");
-                    let now: Vec<Status> = super::shown(&new, &keys(&["security"]), false);
+                    let now: Vec<Status> = shown(&new, &keys(&["security"]), false, false);
                     assert_eq!(now.len(), 2);
                     let at = now.iter().position(|s| *s == which).unwrap();
                     assert_eq!(at, if insert == 0 { 0 } else { 1 }, "{which:?} dropped at {insert} stands there");
@@ -242,22 +271,12 @@ mod tests {
     }
 
     #[test]
-    fn a_row_dragged_onto_another_takes_its_place() {
-        // eject, security, network, volume
-        assert_eq!(placed(&[], Status::Volume, 0), keys(&["volume", "eject", "security", "network"]));
-        assert_eq!(placed(&[], Status::Eject, 3), keys(&["security", "network", "volume", "eject"]));
-        assert_eq!(placed(&[], Status::Eject, 2), keys(&["security", "network", "eject", "volume"]), "down: it stands where the row it was dropped on stood");
-        assert_eq!(placed(&[], Status::Volume, 1), keys(&["eject", "volume", "security", "network"]), "up: the same");
-        assert_eq!(placed(&[], Status::Network, 2), keys(&["eject", "security", "network", "volume"]), "onto its own row: as it was");
-        assert_eq!(placed(&[], Status::Network, 99), keys(&["eject", "security", "volume", "network"]), "past the end is the end");
-        assert_eq!(placed(&keys(&["x", "volume"]), Status::Eject, 0), keys(&["eject", "volume", "security", "network"]), "written back whole and clean");
-    }
-
-    #[test]
     fn every_key_is_read_back_as_its_button() {
         for s in Status::ALL {
             assert_eq!(Status::from_key(s.key()), Some(s));
         }
         assert_eq!(Status::from_key("clock"), None);
+        let unique: std::collections::HashSet<&str> = Status::ALL.iter().map(|s| s.key()).collect();
+        assert_eq!(unique.len(), Status::ALL.len());
     }
 }

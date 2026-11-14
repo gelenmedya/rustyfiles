@@ -581,6 +581,8 @@ pub struct Settings {
     /// The left and the right island are as tall as the middle one (off: they are lower, as they always were). While the dock is thin
     /// under a maximised window all three are the thin height either way.
     pub dock_side_tall: bool,
+    /// Turning the mouse wheel over a running app's icon in the dock turns that app's own sound level up or down (on; issue 21).
+    pub dock_scroll_volume: bool,
     /// How much the dock's icons grow under the pointer (off / subtle / full).
     pub dock_magnify: DockMagnify,
     /// Resting the pointer on a running app's icon in the dock shows a preview of its windows (on; the dock itself is opt-in). Off: nothing.
@@ -770,6 +772,7 @@ impl Default for Settings {
             dock_status_order: Vec::new(),
             dock_status_hidden: Vec::new(),
             dock_side_tall: false,
+            dock_scroll_volume: true,
             dock_magnify: DockMagnify::Full,
             dock_hover_previews: true,
             dock_app_menu: true,
@@ -1473,6 +1476,10 @@ dock_own_notifications = 3
         use super::DockMagnify;
         use rf_win::dock::magnify::Strength;
         assert_eq!(Settings::default().dock_magnify, DockMagnify::Full);
+        // the wheel over an icon: on, also for a file from before, and it can be switched off
+        assert!(Settings::default().dock_scroll_volume);
+        assert!(Settings::parse_lenient("theme = \"dark\"\n").unwrap().dock_scroll_volume);
+        assert!(!Settings::parse_lenient("dock_scroll_volume = false\n").unwrap().dock_scroll_volume);
         assert_eq!(Settings::parse_lenient("theme = \"dark\"\n").unwrap().dock_magnify, DockMagnify::Full, "a file from before has none: the default");
         for (m, s, name) in [(DockMagnify::Off, Strength::Off, "off"), (DockMagnify::Subtle, Strength::Subtle, "subtle"), (DockMagnify::Full, Strength::Full, "full")] {
             assert_eq!(m.strength(), s);
