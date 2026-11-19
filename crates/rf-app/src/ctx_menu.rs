@@ -194,6 +194,21 @@ impl FolderView {
                     cx.emit(FolderEvent::OpenInOtherPane(Location::Path(c.clone())))
                 })));
             }
+            if !in_archive && !rf_win::ftp::is_ftp(&target_dir) {
+                let folder = target_dir.clone();
+                v.push(Item::action(
+                    t!("Change Folder Icon"),
+                    icon(L::Folder),
+                    move |_, _| {
+                        let folder = folder.clone();
+                        rf_win::sta::run(move |_| {
+                            if let Err(e) = rf_win::ctxmenu::invoke_change_folder_icon(&folder) {
+                                log::warn!("Change Folder Icon: {e:#}");
+                            }
+                        });
+                    },
+                ));
+            }
         }
         if has_files {
             v.push(Item::Sub { label: t!("Şununla aç").into(), icon: icon(L::LayoutGrid), items: Sub::Pending { key: "openwith", fallback: None } });
