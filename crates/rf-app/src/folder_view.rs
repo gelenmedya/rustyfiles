@@ -4955,6 +4955,18 @@ impl FolderView {
                 .hover(|s| s.bg(p.tile_hover))
         };
         let section = |title: &'static str| div().text_sm().font_weight(FontWeight::SEMIBOLD).text_color(p.text).child(title);
+        // Home has no shell icon request: ask the pack for a location name, then fall back to Lucide.
+        let home_icon = |names: &[&str], cat: Category, ext: &str, fallback: L, size: f32, color: Hsla| -> AnyElement {
+            let picture = if names.is_empty() {
+                crate::icon_theme::picture_for_kind(cat, ext, size as u32)
+            } else {
+                crate::icon_theme::picture_for_names(names, size as u32)
+            };
+            match picture {
+                Some(pic) => img(pic).size(px(size)).into_any_element(),
+                None => Icon::new(fallback).size(px(size)).text_color(color).into_any_element(),
+            }
+        };
 
         // equal-width columns: a card alone on the last row is as wide as the others
         let avail = f32::from(self.content_width) - 48.; // p_6 on both sides
@@ -4963,7 +4975,7 @@ impl FolderView {
             let path = f.path.clone();
             pinned_grid = pinned_grid.child(
                 card(("pin", i).into())
-                    .child(Icon::new(f.icon).size(px(28.)).text_color(p.accent))
+                    .child(home_icon(crate::icon_theme::special_folder_names(&f.path), Category::Folder, "", f.icon, 28., p.accent))
                     .child(div().text_sm().child(crate::i18n::td(&f.title)))
                     .on_click(cx.listener(move |this, _, _, cx| this.navigate(Location::Path(path.clone()), cx))),
             );
@@ -4981,7 +4993,7 @@ impl FolderView {
                         h_flex()
                             .gap_3()
                             .items_center()
-                            .child(Icon::new(places::drive_icon(&d)).size(px(28.)).text_color(p.text_secondary))
+                            .child(home_icon(places::drive_icon_names(d.kind), Category::Other, "", places::drive_icon(&d), 28., p.text_secondary))
                             .child(
                                 v_flex()
                                     .flex_1()
@@ -5034,7 +5046,7 @@ impl FolderView {
                         h_flex()
                             .gap_3()
                             .items_center()
-                            .child(Icon::new(L::Usb).size(px(28.)).text_color(p.text_secondary))
+                            .child(home_icon(&["multimedia-player", "drive-removable-media"], Category::Other, "", L::Usb, 28., p.text_secondary))
                             .child(div().flex_1().min_w_0().text_sm().overflow_hidden().text_ellipsis().whitespace_nowrap().child(d.name)),
                     )
                     .on_click(cx.listener(move |this, _, _, cx| this.navigate(loc.clone(), cx))),
@@ -5068,7 +5080,7 @@ impl FolderView {
                         h_flex()
                             .gap_3()
                             .items_center()
-                            .child(Icon::new(L::Network).size(px(28.)).text_color(p.text_secondary))
+                            .child(home_icon(&["folder-network", "network-workgroup"], Category::Other, "", L::Network, 28., p.text_secondary))
                             .child(
                                 v_flex()
                                     .flex_1()
@@ -5090,6 +5102,8 @@ impl FolderView {
             let parent = r.target.parent().map(|p| p.to_string_lossy().into_owned()).unwrap_or_default();
             let target = r.target.clone();
             let is_dir = r.is_dir;
+            let names = if is_dir { crate::icon_theme::special_folder_names(&r.target) } else { &[] };
+            let ext = r.target.extension().and_then(|e| e.to_str()).unwrap_or_default();
             // folders under their Explorer name (Downloads → İndirilenler)
             let shown: String = if is_dir { rf_win::localized::label_if_known(&target).map_or_else(|| r.name.clone(), |l| l.to_string()) } else { r.name.clone() };
             recent_list = recent_list.child(
@@ -5103,7 +5117,7 @@ impl FolderView {
                     .text_sm()
                     .hover(|s| s.bg(p.hover))
                     .cursor_pointer()
-                    .child(Icon::new(icons::icon_for(cat)).size(px(16.)).text_color(theme::kind_color(cat, p.dark)))
+                    .child(home_icon(names, cat, ext, icons::icon_for(cat), 16., theme::kind_color(cat, p.dark)))
                     .child(div().w(px(260.)).flex_shrink_0().overflow_hidden().text_ellipsis().whitespace_nowrap().child(shown))
                     .child(
                         div()
