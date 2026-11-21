@@ -37,6 +37,7 @@ mod i18n_en;
 mod folder_history;
 mod folder_view;
 mod icons;
+mod icon_theme;
 mod keymap_editor;
 mod last_window;
 mod logfile;
@@ -871,6 +872,7 @@ pub fn main() {
             rf_core::textload::set_locale_hint(None);
         }
         settings::apply_component_theme(cx);
+        settings::prewarm_icon_pack(cx);
         cx.set_global(tags::load());
         let ops = cx.new(status_center::Ops::new);
         // the Status Center flyout is its own Acrylic window, opened/closed with `open`

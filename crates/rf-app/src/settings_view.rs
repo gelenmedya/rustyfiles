@@ -15,7 +15,8 @@ use crate::fluent_menu::{self, Item, Menu, MenuIcon};
 use crate::select_box::{Choice, select_box};
 use crate::i18n::Lang;
 use crate::settings::{
-    self, AnimPref, BackdropPref, ClickPref, DatePref, DefaultView, DeletePref, IdePref, RendererPref, Settings, StartupPref, ThemePref,
+    self, AnimPref, BackdropPref, ClickPref, DatePref, DefaultView, DeletePref, IconThemePref, IdePref, RendererPref, Settings, StartupPref,
+    ThemePref,
 };
 use crate::t;
 use crate::look::config::LookSettings;
@@ -294,6 +295,81 @@ pub(crate) fn dropdown<T: Copy + PartialEq + 'static>(id: &'static str, p: &Pale
     })
 }
 
+/// Picks a freedesktop pack from `%APPDATA%\rustyfiles\icon-themes`. Picking one switches the icon theme to it; "None" goes back
+/// to the system pictures. The pack list is read when the menu opens, so a newly installed pack shows without a restart.
+fn icon_pack_dropdown(p: &Palette) -> AnyElement {
+    let current = settings::icon_theme_pack();
+    let label: SharedString = if current.is_empty() {
+        t!("Yerel (varsayılan)").into()
+    } else {
+        current.clone().into()
+    };
+    select_box("icon-theme-pack", p, label, move |_| {
+        crate::icon_theme::refresh_packs();
+        let none_label: SharedString = t!("Yerel (varsayılan)").into();
+        let mut out = vec![Choice::new(none_label, current.is_empty(), |_, cx| {
+            settings::update(cx, |s| {
+                s.icon_theme = IconThemePref::Windows;
+                s.icon_theme_pack.clear();
+            });
+        })];
+        for name in crate::icon_theme::available_packs() {
+            let selected = name == current;
+            let pack = name.clone();
+            out.push(Choice::new(name, selected, move |_, cx| {
+                settings::update(cx, |s| {
+                    s.icon_theme = IconThemePref::Freedesktop;
+                    s.icon_theme_pack = pack.clone();
+                });
+            }));
+        }
+        out
+    })
+}
+
+/// Helper to open the themes folder using the OpenIconThemesFolder action.
+fn open_icon_themes_folder(window: &mut Window, cx: &mut App) {
+    if let Some(d) = settings::app_dir() {
+        let d = d.join("icon-themes");
+        let _ = std::fs::create_dir_all(&d);
+        window.dispatch_action(Box::new(crate::actions::OpenIconThemesFolder), cx);
+    }
+}
+
+/// Variant picker for theme families such as Papirus / Papirus-Dark. Hidden when the selected
+/// pack has no installed siblings. The pack name itself is the stored variant.
+fn icon_variant_dropdown(p: &Palette) -> Option<AnyElement> {
+    let current = settings::icon_theme_pack();
+    let variants = crate::icon_theme::theme_variants(&current);
+    if variants.len() < 2 {
+        return None;
+    }
+    let selected_label: SharedString = variants
+        .iter()
+        .find(|(_, pack)| pack == &current)
+        .map(|(label, _)| label.clone())
+        .unwrap_or_else(|| current.clone())
+        .into();
+    let label: SharedString = format!("{}: {}", t!("Varyasyon"), selected_label).into();
+    Some(select_box("icon-theme-variant", p, label, move |_| {
+        crate::icon_theme::refresh_packs();
+        variants
+            .iter()
+            .map(|(label, pack)| {
+                let selected = pack == &current;
+                let pack = pack.clone();
+                let label: SharedString = label.clone().into();
+                Choice::new(label, selected, move |_, cx| {
+                    settings::update(cx, |s| {
+                        s.icon_theme = IconThemePref::Freedesktop;
+                        s.icon_theme_pack = pack.clone();
+                    });
+                })
+            })
+            .collect()
+    }))
+}
+
 pub(crate) fn button(id: impl Into<ElementId>, p: &Palette, label: impl Into<SharedString>, run: impl Fn(&mut Window, &mut App) + 'static) -> AnyElement {
     div()
         .id(id)
@@ -312,6 +388,36 @@ pub(crate) fn button(id: impl Into<ElementId>, p: &Palette, label: impl Into<Sha
         .hover(|s| s.bg(p.pressed))
         .active(|s| s.opacity(0.8))
         .child(label.into())
+        .on_click(move |_, window, cx| run(window, cx))
+        .into_any_element()
+}
+
+fn icon_button(id: impl Into<ElementId>, p: &Palette, icon: L, tip: impl Into<SharedString>, run: impl Fn(&mut Window, &mut App) + 'static) -> AnyElement {
+    let tip: SharedString = tip.into();
+    let dark = p.dark;
+    let base = div()
+        .id(id)
+        .size(px(32.))
+        .flex()
+        .items_center()
+        .justify_center()
+        .cursor_pointer()
+        .tab_index(0)
+        .active(|s| s.opacity(0.8));
+    let styled = if p.liquid {
+        base.rounded_full()
+            .bg(crate::liquid::dropdown_fill(dark, false))
+            .hover(move |s| s.bg(crate::liquid::dropdown_fill(dark, true)))
+    } else {
+        base.rounded(theme::RADIUS_SM)
+            .bg(p.hover)
+            .border_1()
+            .border_color(p.border)
+            .hover(|s| s.bg(p.pressed))
+    };
+    styled
+        .tooltip(move |w, cx| gpui_kit::component::tooltip::Tooltip::new(tip.clone()).build(w, cx))
+        .child(Icon::new(icon).size(px(16.)).text_color(p.text_secondary))
         .on_click(move |_, window, cx| run(window, cx))
         .into_any_element()
 }
@@ -1496,6 +1602,24 @@ fn appearance(p: &Palette, s: &Settings, cx: &mut App) -> Vec<AnyElement> {
                 |s, v| s.theme = v,
             ),
         ),
+        card(
+            p,
+            L::Image,
+            t!("İkon teması").into(),
+            Some(t!("Dosya ve klasör simgeleri. Sistem simgelerini kullanır; Freedesktop paketlerini listeden seçin ya da klasörü açın. Paketin varyasyonları varsa ayrıca seçilebilir.").into()),
+            v_flex()
+                .gap_2()
+                .items_start()
+                .child(
+                    h_flex()
+                        .gap_2()
+                        .items_center()
+                        .child(icon_pack_dropdown(p))
+                        .child(icon_button("icon-theme-folder", p, L::FolderOpen, t!("Gözat"), open_icon_themes_folder)),
+                )
+                .children(icon_variant_dropdown(p))
+                .into_any_element(),
+        ),
         backdrop_card(p, s),
         accent_card(p, s),
         card(
@@ -1544,9 +1668,9 @@ fn appearance(p: &Palette, s: &Settings, cx: &mut App) -> Vec<AnyElement> {
             sw("scrollbar", p, s.show_scrollbar, |s, v| s.show_scrollbar = v),
         ),
     ];
-    // HyperGlass look, right under the backdrop card (index 1) while Glass is the material
+    // HyperGlass look, right under the backdrop card (index 3) while Glass is the material
     if s.backdrop_in_use() == BackdropPref::Glass || crate::glass::forced() {
-        v.insert(2, hyperglass_card(p, s, cx));
+        v.insert(3, hyperglass_card(p, s, cx));
     }
     // tint swatches
     let tint = s.tint;

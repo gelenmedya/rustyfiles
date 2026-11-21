@@ -241,6 +241,17 @@ fn root_kind(k: DriveKind) -> RootKind {
     }
 }
 
+/// Freedesktop names for tree roots, so a drive row is a disk or a CD rather than a folder.
+fn root_icon_names(kind: RootKind) -> &'static [&'static str] {
+    match kind {
+        RootKind::Profile => &["user-home", "folder-home"],
+        RootKind::Fixed => &["drive-harddisk", "drive-harddisk-system"],
+        RootKind::Removable => &["drive-removable-media", "drive-harddisk-usb", "drive-harddisk"],
+        RootKind::Network => &["network-server", "folder-remote"],
+        RootKind::Optical => &["drive-optical", "drive-cdrom"],
+    }
+}
+
 impl SidebarTree {
     fn new(places: Entity<Places>, images: Entity<crate::image_cache::ImageCache>, scroll: ScrollHandle, cx: &mut Context<Self>) -> Self {
         let (tx, mut rx) = mpsc::unbounded::<Msg>();
@@ -686,14 +697,28 @@ impl SidebarTree {
         let covers = !selected && mark == Some((ix, false));
         let cursor = info.cursor && focused;
         let (expanded, can_expand, root, hidden, slow) = (info.expanded, info.can_expand, info.root, info.hidden, info.slow);
-        // a customised folder (not a root) shows the icon Windows gives it, as the file list does (issue 65)
-        let own_icon = (info.own_icon && root.is_none())
-            .then(|| {
-                let (dir, name) = (info.path.parent()?.to_path_buf(), info.path.file_name()?.to_string_lossy().into_owned());
-                let e = rf_core::Entry::new(&name, rf_core::EntryKind::Dir, 0, 0, 0, 0x10 | 0x1);
-                self.images.update(cx, |c, cx| c.icon(&dir, &e, cx))
-            })
-            .flatten();
+        let freedesktop = matches!(crate::settings::icon_theme(), crate::settings::IconThemePref::Freedesktop);
+        let req_px = crate::image_cache::ICON_PX;
+        let (dir, name) = (info.path.parent().unwrap_or_else(|| std::path::Path::new("")), info.path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default());
+        let e = rf_core::Entry::new(&name, rf_core::EntryKind::Dir, 0, 0, 0, 0x10 | 0x1);
+        // Pack lookup (including `desktop.ini`) runs on a worker. The shell call stays the native path when no pack is active.
+        let folder_picture = if freedesktop {
+            let mut names: Vec<&'static str> = match root {
+                Some(kind) => root_icon_names(kind).to_vec(),
+                None => crate::icon_theme::special_folder_names(info.path).to_vec(),
+            };
+            if root.is_none() {
+                names.extend_from_slice(crate::icon_theme::FOLDER_NAMES);
+            }
+            match self.images.update(cx, |c, cx| c.themed_or_native_picture(dir, &e, &names, req_px, cx)) {
+                crate::image_cache::PackPicture::Ready(im) => Some(im),
+                _ => None,
+            }
+        } else if info.own_icon && root.is_none() {
+            self.images.update(cx, |c, cx| c.icon(dir, &e, cx))
+        } else {
+            None
+        };
         let tag_dot = info.path.parent().and_then(|_| crate::tags::first_color(info.path, cx));
         let icon_color = match root {
             Some(RootKind::Profile) => p.accent,
@@ -765,7 +790,7 @@ impl SidebarTree {
                     .relative()
                     .size(px(16.))
                     .flex_shrink_0()
-                    .child(match own_icon {
+                    .child(match folder_picture {
                         Some(picture) => img(picture).size(px(16.)).into_any_element(),
                         None => Icon::new(Self::row_icon(root, expanded)).size(px(16.)).text_color(icon_color).into_any_element(),
                     })

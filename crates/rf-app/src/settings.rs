@@ -1,6 +1,7 @@
 //! Persistent user settings (%APPDATA%\rustyfiles\settings.toml) as a GPUI global.
 
 use std::path::PathBuf;
+use std::sync::OnceLock;
 use std::sync::atomic::{AtomicU8, Ordering};
 
 use gpui_kit::*;
@@ -18,6 +19,19 @@ pub enum ThemePref {
     /// Pure black for OLED screens: black surfaces, white text, no see-through material (issue 45: "A true black background
     /// (#000000). Pure white text (#FFFFFF)").
     Black,
+}
+
+/// Generic file icons: the shell's current pictures or a freedesktop pack in `icon-themes/`.
+/// Old settings have no key and stay on `Windows`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum IconThemePref {
+    #[default]
+    Windows,
+    Freedesktop,
+    /// Value written by the discarded local XP build. Kept so that settings file still loads; behaves like `Windows`.
+    #[serde(other)]
+    Legacy,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -562,6 +576,10 @@ pub struct Settings {
     // ---- Appearance
     /// A scrollbar over the Details and Grid lists.
     pub show_scrollbar: bool,
+    /// Generic file icons. `Windows` uses the shell, as before.
+    pub icon_theme: IconThemePref,
+    /// Folder name of a freedesktop pack under `%APPDATA%\rustyfiles\icon-themes` (empty = none).
+    pub icon_theme_pack: String,
     pub animations: AnimPref,
     pub backdrop: BackdropPref,
     /// Background tint color (0xRRGGBB), `None` = the backdrop as is.
@@ -932,6 +950,8 @@ impl Default for Settings {
             menu: MenuPrefs::default(),
             smooth_scroll: true,
             show_scrollbar: true,
+            icon_theme: IconThemePref::Windows,
+            icon_theme_pack: String::new(),
             animations: AnimPref::System,
             backdrop: BackdropPref::Mica,
             tint: None,
@@ -1072,6 +1092,9 @@ impl Global for Settings {}
 pub const HG_DEFAULT: [u8; 5] = [52, 50, 67, 62, 50];
 
 static THEME: AtomicU8 = AtomicU8::new(0);
+static ICON_THEME: AtomicU8 = AtomicU8::new(0);
+/// The selected freedesktop pack's folder name, read by the icon cache without a `Settings` global.
+static ICON_PACK: std::sync::OnceLock<parking_lot::RwLock<String>> = std::sync::OnceLock::new();
 /// The surface value (0..=100) the palette reads on every call, cheaper than the settings struct.
 static HG_SURFACE: AtomicU8 = AtomicU8::new(HG_DEFAULT[4]);
 static SOLID: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
@@ -1126,6 +1149,46 @@ pub fn theme_override() -> ThemePref {
         3 => ThemePref::Black,
         _ => ThemePref::System,
     }
+}
+
+/// Effective light/dark appearance without needing an `App`. Kept in an atomic: rows ask for it on every frame,
+/// and `ThemePref::System` would otherwise read the registry for every row.
+pub fn effective_dark() -> bool {
+    static DARK: OnceLock<std::sync::atomic::AtomicBool> = OnceLock::new();
+    DARK.get_or_init(|| std::sync::atomic::AtomicBool::new(compute_effective_dark())).load(Ordering::Relaxed)
+}
+
+fn compute_effective_dark() -> bool {
+    match theme_override() {
+        ThemePref::Light => false,
+        ThemePref::Dark | ThemePref::Black => true,
+        ThemePref::System => rf_win::accent::system_is_dark(),
+    }
+}
+
+/// The OS appearance changed while the app was open. Only `System` follows it; a fixed choice stays.
+pub fn system_appearance_changed(dark: bool) {
+    if theme_override() == ThemePref::System {
+        set_effective_dark(dark);
+    }
+}
+
+fn set_effective_dark(dark: bool) {
+    static DARK: OnceLock<std::sync::atomic::AtomicBool> = OnceLock::new();
+    DARK.get_or_init(|| std::sync::atomic::AtomicBool::new(false)).store(dark, Ordering::Relaxed);
+}
+
+/// Read without a `Settings` global, for the shared icon cache.
+pub fn icon_theme() -> IconThemePref {
+    match ICON_THEME.load(Ordering::Relaxed) {
+        2 => IconThemePref::Freedesktop,
+        _ => IconThemePref::Windows,
+    }
+}
+
+/// The selected freedesktop pack's folder name.
+pub fn icon_theme_pack() -> String {
+    ICON_PACK.get_or_init(|| parking_lot::RwLock::new(String::new())).read().clone()
 }
 
 pub fn path() -> Option<PathBuf> {
@@ -1347,6 +1410,12 @@ impl Settings {
             },
             Ordering::Relaxed,
         );
+        set_effective_dark(compute_effective_dark());
+        ICON_THEME.store(match self.icon_theme {
+            IconThemePref::Freedesktop => 2,
+            IconThemePref::Windows | IconThemePref::Legacy => 0,
+        }, Ordering::Relaxed);
+        *ICON_PACK.get_or_init(|| parking_lot::RwLock::new(String::new())).write() = self.icon_theme_pack.clone();
         // An explicit RUSTYFILES_RENDERER env var wins (debugging).
         if std::env::var_os("RUSTYFILES_RENDERER").is_none() {
             gpui_windows::hybrid::set_mode(renderer_mode(self.renderer, crate::background::DOCK_PROCESS.load(Ordering::Relaxed)));
@@ -1396,12 +1465,32 @@ pub fn apply_component_theme(cx: &mut App) {
     }
 }
 
+/// Rasterize the common pack icons before the next paint. A new pack (or a new light/dark variant)
+/// would otherwise make the first folder render parse every SVG on the UI thread.
+pub fn prewarm_icon_pack(cx: &mut App) {
+    let s = cx.global::<Settings>();
+    if s.icon_theme != IconThemePref::Freedesktop || s.icon_theme_pack.is_empty() {
+        return;
+    }
+    // COM known-folder lookups happen once here, before rows ask for their icon names.
+    crate::icon_theme::prewarm_known_folders();
+    let pack = s.icon_theme_pack.clone();
+    cx.spawn(async move |cx| {
+        cx.background_executor().spawn(async move { crate::icon_theme::prewarm(&pack) }).await;
+        cx.update(|cx| cx.refresh_windows());
+    })
+    .detach();
+}
+
 /// Mutates the global settings, applies side effects, saves in the background and refreshes windows.
 pub fn update(cx: &mut App, f: impl FnOnce(&mut Settings)) {
+    let old = cx.global::<Settings>().clone();
     cx.update_global::<Settings, _>(|s, _| f(s));
     let s = cx.global::<Settings>().clone();
     s.apply_side_effects();
     apply_component_theme(cx);
+    let icon_pack_changed = s.icon_theme != old.icon_theme || s.icon_theme_pack != old.icon_theme_pack;
+    let theme_changed = s.theme != old.theme;
     std::thread::spawn(move || {
         s.save();
         // after the save: the dock process reads the file when it is told to reload
@@ -1409,6 +1498,15 @@ pub fn update(cx: &mut App, f: impl FnOnce(&mut Settings)) {
     });
     // (Ferry follows its settings: started, stopped, started anew, or shown to others differently)
     crate::ferry::apply(cx);
+    if icon_pack_changed || theme_changed {
+        // A newly installed pack must be visible without a restart, and a system-theme switch must pick the other variant.
+        crate::icon_theme::clear_caches();
+        crate::image_cache::clear_for_pack_change(cx);
+    }
+    if icon_pack_changed {
+        crate::icon_theme::refresh_packs();
+        prewarm_icon_pack(cx);
+    }
     cx.refresh_windows();
 }
 
@@ -1416,8 +1514,15 @@ pub fn update(cx: &mut App, f: impl FnOnce(&mut Settings)) {
 /// written once the changes have settled (the pane resize does the same), so a drag is not hundreds of writes.
 pub fn update_live(cx: &mut App, f: impl FnOnce(&mut Settings)) {
     static SERIAL: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let old = cx.global::<Settings>().clone();
     cx.update_global::<Settings, _>(|s, _| f(s));
     cx.global::<Settings>().apply_side_effects();
+    let look_changed = old.theme != cx.global::<Settings>().theme;
+    if look_changed {
+        crate::icon_theme::clear_caches();
+        crate::image_cache::clear_for_pack_change(cx);
+        prewarm_icon_pack(cx);
+    }
     cx.refresh_windows();
     let mine = SERIAL.fetch_add(1, Ordering::Relaxed) + 1;
     cx.spawn(async move |cx| {
@@ -1480,7 +1585,26 @@ mod tests {
         // unknown/missing keys fall back to defaults
         let partial: Settings = toml::from_str("theme = \"dark\"").unwrap();
         assert_eq!(partial.theme, ThemePref::Dark);
+        // a settings file written before icon themes keeps the shell icons
+        assert_eq!(partial.icon_theme, super::IconThemePref::Windows);
+        let legacy: Settings = toml::from_str("icon_theme = \"xp\"").unwrap();
+        assert_eq!(legacy.icon_theme, super::IconThemePref::Legacy);
         assert!(partial.restore_session);
+    }
+
+    /// The Freedesktop choice and its pack survive the file; an unknown choice is inert, a bad pack is dropped.
+    #[test]
+    fn icon_theme_choice_and_pack_roundtrip() {
+        let s = Settings { icon_theme: super::IconThemePref::Freedesktop, icon_theme_pack: "Papirus".into(), ..Default::default() };
+        let back: Settings = toml::from_str(&toml::to_string_pretty(&s).unwrap()).unwrap();
+        assert_eq!(back.icon_theme, super::IconThemePref::Freedesktop);
+        assert_eq!(back.icon_theme_pack, "Papirus");
+        let modern: Settings = toml::from_str("icon_theme = \"freedesktop\"\nicon_theme_pack = \"Adwaita\"\n").unwrap();
+        assert_eq!(modern.icon_theme, super::IconThemePref::Freedesktop);
+        assert_eq!(modern.icon_theme_pack, "Adwaita");
+        let bad = Settings::parse_lenient("icon_theme = \"nope\"\nicon_theme_pack = 7\n").unwrap();
+        assert_eq!(bad.icon_theme, super::IconThemePref::Legacy, "an unknown older value stays inert");
+        assert!(bad.icon_theme_pack.is_empty(), "a non-string pack is ignored");
     }
 
     /// The second panes of the session survive the settings file, and a file from before them has none.

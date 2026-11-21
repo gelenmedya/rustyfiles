@@ -2982,7 +2982,15 @@ impl FolderView {
         // Settings → "Show thumbnails" off: the file type's icon instead of a preview
         let thumbs_on = cx.global::<crate::settings::Settings>().show_thumbnails;
         let thumb = self.parent_of(ei).map(|d| d.to_path_buf()).and_then(|d| {
-            self.images.update(cx, |c, cx| if thumbs_on { c.thumbnail(&d, e, thumb_px, cx) } else { c.icon(&d, e, cx) })
+            self.images.update(cx, |c, cx| {
+                if thumbs_on {
+                    c.thumbnail(&d, e, thumb_px, cx)
+                } else if crate::settings::icon_theme() == crate::settings::IconThemePref::Freedesktop {
+                    c.icon_sized(&d, e, thumb_px, cx)
+                } else {
+                    c.icon(&d, e, cx)
+                }
+            })
         });
         let is_thumb = icons::has_thumbnail(e);
         let visual: AnyElement = match thumb {
@@ -4977,15 +4985,56 @@ impl FolderView {
                 .hover(|s| s.bg(p.tile_hover))
         };
         let section = |title: &'static str| div().text_sm().font_weight(FontWeight::SEMIBOLD).text_color(p.text).child(title);
+        let freedesktop = matches!(crate::settings::icon_theme(), crate::settings::IconThemePref::Freedesktop);
+        let pack = crate::settings::icon_theme_pack();
+        // All pack work is queued on the image cache; the first paint uses the Lucide fallback.
+        let pack_icon = |cx: &mut Context<Self>, names: &[&'static str], size: f32| -> Option<Arc<RenderImage>> {
+            if !freedesktop || pack.is_empty() || names.is_empty() {
+                return None;
+            }
+            let px = (size as u32).max(crate::image_cache::ICON_PX);
+            match self.images.update(cx, |c, cx| c.pack_picture_for_names(&pack, names, px, cx)) {
+                crate::image_cache::PackPicture::Ready(im) => Some(im),
+                _ => None,
+            }
+        };
+        // Pinned folders and recent files: a real `desktop.ini` icon (and every .exe/.lnk) keeps the shell's own picture.
+        // With no pack chosen Home keeps its Lucide icons, as on main.
+        let item_icon = |cx: &mut Context<Self>, path: &std::path::Path, names: &[&'static str], cat: crate::icons::Category, ext: &str, is_dir: bool, size: f32| -> Option<Arc<RenderImage>> {
+            if !freedesktop || pack.is_empty() {
+                return None;
+            }
+            let px = (size as u32).max(crate::image_cache::ICON_PX);
+            let own = matches!(ext.to_ascii_lowercase().as_str(), "exe" | "lnk");
+            let kind = if is_dir { rf_core::EntryKind::Dir } else { rf_core::EntryKind::File };
+            let name = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+            let entry = rf_core::Entry::new(&name, kind, 0, 0, 0, if is_dir { 0x10 | 0x1 } else { 0x20 });
+            let dir = path.parent().unwrap_or_else(|| std::path::Path::new(""));
+            let names: Vec<&'static str> = if own { Vec::new() } else { names.to_vec() };
+            let _ = cat;
+            match self.images.update(cx, |c, cx| c.themed_or_native_picture(dir, &entry, &names, px, cx)) {
+                crate::image_cache::PackPicture::Ready(im) => Some(im),
+                _ => None,
+            }
+        };
+        let home_icon = |picture: Option<Arc<RenderImage>>, fallback: L, size: f32, color: Hsla| -> AnyElement {
+            match picture {
+                Some(pic) => img(pic).size(px(size)).object_fit(ObjectFit::Contain).into_any_element(),
+                None => Icon::new(fallback).size(px(size)).text_color(color).into_any_element(),
+            }
+        };
 
         // equal-width columns: a card alone on the last row is as wide as the others
         let avail = f32::from(self.content_width) - 48.; // p_6 on both sides
         let mut pinned_grid = div().grid().grid_cols(tile_cols(avail, 140., 220., 12.)).gap_3();
         for (i, f) in pinned.into_iter().enumerate() {
             let path = f.path.clone();
+            let mut names = crate::icon_theme::special_folder_names(&f.path).to_vec();
+            names.extend_from_slice(crate::icon_theme::FOLDER_NAMES);
+            let picture = item_icon(cx, &f.path, &names, Category::Folder, "", true, 28.);
             pinned_grid = pinned_grid.child(
                 card(("pin", i).into())
-                    .child(Icon::new(f.icon).size(px(28.)).text_color(p.accent))
+                    .child(home_icon(picture, f.icon, 28., p.accent))
                     .child(div().text_sm().child(crate::i18n::td(&f.title)))
                     .on_click(cx.listener(move |this, _, _, cx| this.navigate(Location::Path(path.clone()), cx))),
             );
@@ -5003,7 +5052,7 @@ impl FolderView {
                         h_flex()
                             .gap_3()
                             .items_center()
-                            .child(Icon::new(places::drive_icon(&d)).size(px(28.)).text_color(p.text_secondary))
+                            .child(home_icon(pack_icon(cx, places::drive_icon_names(d.kind), 28.), places::drive_icon(&d), 28., p.text_secondary))
                             .child(
                                 v_flex()
                                     .flex_1()
@@ -5056,7 +5105,7 @@ impl FolderView {
                         h_flex()
                             .gap_3()
                             .items_center()
-                            .child(Icon::new(L::Usb).size(px(28.)).text_color(p.text_secondary))
+                            .child(home_icon(pack_icon(cx, &["multimedia-player", "drive-removable-media"], 28.), L::Usb, 28., p.text_secondary))
                             .child(div().flex_1().min_w_0().text_sm().overflow_hidden().text_ellipsis().whitespace_nowrap().child(d.name)),
                     )
                     .on_click(cx.listener(move |this, _, _, cx| this.navigate(loc.clone(), cx))),
@@ -5090,7 +5139,7 @@ impl FolderView {
                         h_flex()
                             .gap_3()
                             .items_center()
-                            .child(Icon::new(L::Network).size(px(28.)).text_color(p.text_secondary))
+                            .child(home_icon(pack_icon(cx, &["folder-network", "network-workgroup"], 28.), L::Network, 28., p.text_secondary))
                             .child(
                                 v_flex()
                                     .flex_1()
@@ -5112,6 +5161,17 @@ impl FolderView {
             let parent = r.target.parent().map(|p| p.to_string_lossy().into_owned()).unwrap_or_default();
             let target = r.target.clone();
             let is_dir = r.is_dir;
+            let ext = r.target.extension().and_then(|e| e.to_str()).unwrap_or_default();
+            let names: Vec<&'static str> = if is_dir {
+                let mut n = crate::icon_theme::special_folder_names(&r.target).to_vec();
+                n.extend_from_slice(crate::icon_theme::FOLDER_NAMES);
+                n
+            } else if matches!(ext.to_ascii_lowercase().as_str(), "exe" | "lnk") {
+                Vec::new()
+            } else {
+                crate::icon_theme::image_names(cat, ext)
+            };
+            let picture = item_icon(cx, &r.target, &names, cat, ext, is_dir, 16.);
             // folders under their Explorer name (Downloads → İndirilenler)
             let shown: String = if is_dir { rf_win::localized::label_if_known(&target).map_or_else(|| r.name.clone(), |l| l.to_string()) } else { r.name.clone() };
             recent_list = recent_list.child(
@@ -5125,7 +5185,7 @@ impl FolderView {
                     .text_sm()
                     .hover(|s| s.bg(p.hover))
                     .cursor_pointer()
-                    .child(Icon::new(icons::icon_for(cat)).size(px(16.)).text_color(theme::kind_color(cat, p.dark)))
+                    .child(home_icon(picture, icons::icon_for(cat), 16., theme::kind_color(cat, p.dark)))
                     .child(div().w(px(260.)).flex_shrink_0().overflow_hidden().text_ellipsis().whitespace_nowrap().child(shown))
                     .child(
                         div()

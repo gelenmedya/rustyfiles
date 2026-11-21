@@ -13055,5 +13055,35 @@
   "key": "Tema klasörlerini aç",
   "tr": "Tema klasörlerini aç",
   "en": "Open the themes folder"
+ },
+ {
+  "id": "2cedf68f",
+  "key": "Yerel (varsayılan)",
+  "tr": "Yerel (varsayılan)",
+  "en": "Native (default)"
+ },
+ {
+  "id": "b9676345",
+  "key": "Varyasyon",
+  "tr": "Varyasyon",
+  "en": "Variant"
+ },
+ {
+  "id": "0e00912e",
+  "key": "İkon teması",
+  "tr": "İkon teması",
+  "en": "Icon theme"
+ },
+ {
+  "id": "84511fe8",
+  "key": "Dosya ve klasör simgeleri. Sistem simgelerini kullanır; Freedesktop paketlerini listeden seçin ya da klasörü açın. Paketin varyasyonları varsa ayrıca seçilebilir.",
+  "tr": "Dosya ve klasör simgeleri. Sistem simgelerini kullanır; Freedesktop paketlerini listeden seçin ya da klasörü açın. Paketin varyasyonları varsa ayrıca seçilebilir.",
+  "en": "File and folder icons. Uses system icons; pick a Freedesktop pack from the list or open the pack folder. Variants appear below when the pack has them."
+ },
+ {
+  "id": "59d38c05",
+  "key": "varsayılan",
+  "tr": "varsayılan",
+  "en": "default"
  }
 ]
