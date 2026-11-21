@@ -1,6 +1,7 @@
 //! Persistent user settings (%APPDATA%\rustyfiles\settings.toml) as a GPUI global.
 
 use std::path::PathBuf;
+use std::sync::OnceLock;
 use std::sync::atomic::{AtomicU8, Ordering};
 
 use gpui_kit::*;
@@ -1150,13 +1151,31 @@ pub fn theme_override() -> ThemePref {
     }
 }
 
-/// Effective light/dark appearance without needing an `App`. Icon packs use it to pick a matching variant.
+/// Effective light/dark appearance without needing an `App`. Kept in an atomic: rows ask for it on every frame,
+/// and `ThemePref::System` would otherwise read the registry for every row.
 pub fn effective_dark() -> bool {
+    static DARK: OnceLock<std::sync::atomic::AtomicBool> = OnceLock::new();
+    DARK.get_or_init(|| std::sync::atomic::AtomicBool::new(compute_effective_dark())).load(Ordering::Relaxed)
+}
+
+fn compute_effective_dark() -> bool {
     match theme_override() {
         ThemePref::Light => false,
         ThemePref::Dark | ThemePref::Black => true,
         ThemePref::System => rf_win::accent::system_is_dark(),
     }
+}
+
+/// The OS appearance changed while the app was open. Only `System` follows it; a fixed choice stays.
+pub fn system_appearance_changed(dark: bool) {
+    if theme_override() == ThemePref::System {
+        set_effective_dark(dark);
+    }
+}
+
+fn set_effective_dark(dark: bool) {
+    static DARK: OnceLock<std::sync::atomic::AtomicBool> = OnceLock::new();
+    DARK.get_or_init(|| std::sync::atomic::AtomicBool::new(false)).store(dark, Ordering::Relaxed);
 }
 
 /// Read without a `Settings` global, for the shared icon cache.
@@ -1391,11 +1410,13 @@ impl Settings {
             },
             Ordering::Relaxed,
         );
+        set_effective_dark(compute_effective_dark());
         ICON_THEME.store(match self.icon_theme {
             IconThemePref::Freedesktop => 2,
             IconThemePref::Windows | IconThemePref::Legacy => 0,
         }, Ordering::Relaxed);
         *ICON_PACK.get_or_init(|| parking_lot::RwLock::new(String::new())).write() = self.icon_theme_pack.clone();
+        crate::icon_theme::refresh_packs();
         // An explicit RUSTYFILES_RENDERER env var wins (debugging).
         if std::env::var_os("RUSTYFILES_RENDERER").is_none() {
             gpui_windows::hybrid::set_mode(renderer_mode(self.renderer, crate::background::DOCK_PROCESS.load(Ordering::Relaxed)));
@@ -1468,6 +1489,7 @@ pub fn update(cx: &mut App, f: impl FnOnce(&mut Settings)) {
     s.apply_side_effects();
     apply_component_theme(cx);
     let icon_pack_changed = s.icon_theme != old.icon_theme || s.icon_theme_pack != old.icon_theme_pack;
+    let theme_changed = s.theme != old.theme;
     std::thread::spawn(move || {
         s.save();
         // after the save: the dock process reads the file when it is told to reload
@@ -1475,6 +1497,11 @@ pub fn update(cx: &mut App, f: impl FnOnce(&mut Settings)) {
     });
     // (Ferry follows its settings: started, stopped, started anew, or shown to others differently)
     crate::ferry::apply(cx);
+    if icon_pack_changed || theme_changed {
+        // A newly installed pack must be visible without a restart, and a system-theme switch must pick the other variant.
+        crate::icon_theme::clear_caches();
+        crate::image_cache::clear_for_pack_change(cx);
+    }
     if icon_pack_changed {
         prewarm_icon_pack(cx);
     }
@@ -1490,6 +1517,8 @@ pub fn update_live(cx: &mut App, f: impl FnOnce(&mut Settings)) {
     cx.global::<Settings>().apply_side_effects();
     let look_changed = old.theme != cx.global::<Settings>().theme;
     if look_changed {
+        crate::icon_theme::clear_caches();
+        crate::image_cache::clear_for_pack_change(cx);
         prewarm_icon_pack(cx);
     }
     cx.refresh_windows();

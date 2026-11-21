@@ -2161,4 +2161,8 @@ pub const EN: &[(&str, &str)] = &[
     ("Henüz gezilen klasör yok", "No folders visited yet"),
     ("Komut paletinde geçmiş klasörleri göster", "Show past folders in the command palette"),
     ("Yazdıkça daha önce gidilen klasörler komutlarla birlikte listelenir. Ctrl+P her zaman yalnızca geçmiş klasörlerde arar.", "As you type, folders you went to before are listed with the commands. Ctrl+P always searches past folders only."),
+    ("Yerel (varsayılan)", "Native (default)"),
+    ("Varyasyon", "Variant"),
+    ("İkon teması", "Icon theme"),
+    ("Dosya ve klasör simgeleri. Sistem simgelerini kullanır; Freedesktop paketlerini listeden seçin ya da klasörü açın. Paketin varyasyonları varsa ayrıca seçilebilir.", "File and folder icons. Uses system icons; pick a Freedesktop pack from the list or open the pack folder. Variants appear below when the pack has them."),
 ];
