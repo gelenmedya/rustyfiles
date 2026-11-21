@@ -4977,7 +4977,11 @@ impl FolderView {
             }
         };
         // Pinned folders and recent files: a real `desktop.ini` icon (and every .exe/.lnk) keeps the shell's own picture.
+        // With no pack chosen Home keeps its Lucide icons, as on main.
         let item_icon = |cx: &mut Context<Self>, path: &std::path::Path, names: &[&'static str], cat: crate::icons::Category, ext: &str, is_dir: bool, size: f32| -> Option<Arc<RenderImage>> {
+            if !freedesktop || pack.is_empty() {
+                return None;
+            }
             let px = (size as u32).max(crate::image_cache::ICON_PX);
             let own = matches!(ext.to_ascii_lowercase().as_str(), "exe" | "lnk");
             let kind = if is_dir { rf_core::EntryKind::Dir } else { rf_core::EntryKind::File };
