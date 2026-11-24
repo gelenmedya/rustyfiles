@@ -163,7 +163,6 @@ pub const EN: &[(&str, &str)] = &[
     ("Çekim tarihi", "Date taken"),
     ("Sanatçı", "Artist"),
     ("Albüm", "Album"),
-    ("Yıl", "Year"),
     ("Başlık", "Title"),
     ("Sayfa", "Pages"),
     ("Yazar", "Author"),
