@@ -2981,6 +2981,12 @@ impl Workspace {
                 Item::action(t!("Kenar çubuğuna sabitle"), MenuIcon::Lucide(L::Pin), with(|ws, p, _, cx| ws.set_pinned(p, true, cx)))
             },
         ];
+        // a folder of the user's own in the Drives section (issue 408); a drive is there already
+        if !root {
+            let listed = cx.global::<crate::settings::Settings>().drive_places.contains(&path);
+            let label = if listed { t!("Sürücüler bölümünden kaldır") } else { t!("Sürücüler bölümüne ekle") };
+            items.push(Item::action(label, MenuIcon::Lucide(L::HardDrive), with(|_, p, _, cx| crate::places::toggle_drive_place(p, cx))));
+        }
         if !root && cx.global::<crate::settings::Settings>().menu.tags && !cx.global::<crate::tags::Tags>().0.defs.is_empty() {
             items.push(Item::sub(t!("Etiketler"), MenuIcon::Lucide(L::Tag), crate::tags::menu_items(std::slice::from_ref(&path), cx)));
         }
@@ -4486,7 +4492,9 @@ impl Workspace {
         let drives = if shown("drives") && !self.shows_tree(rail) { drives } else { Vec::new() };
         shown_elsewhere |= drives.iter().any(|d| cur == Location::Path(d.root.clone()));
         col = self.append_tree(col, &cur, shown_elsewhere, rail, p, cx);
-        if !drives.is_empty() {
+        // the user's own places of the Drives section, after the drives (issue 408)
+        let drive_places: Vec<PathBuf> = if shown("drives") { cx.global::<crate::settings::Settings>().drive_places.clone() } else { Vec::new() };
+        if !drives.is_empty() || !drive_places.is_empty() {
             col = col.child(header(t!("Sürücüler")));
         }
         let space_numbers = cx.global::<crate::settings::Settings>().sidebar_drive_space;
@@ -4524,6 +4532,24 @@ impl Workspace {
                 p,
                 cx,
                 places::drive_icon_names(d.kind),
+            ));
+        }
+        for (i, path) in drive_places.into_iter().enumerate() {
+            let loc = Location::Path(path.clone());
+            let active = cur == loc;
+            let name = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| path.to_string_lossy().into_owned());
+            col = col.child(self.sidebar_item(
+                ("sb-drive-place", i).into(),
+                L::Folder,
+                theme::kind_color(crate::icons::Category::Folder, p.dark),
+                name,
+                loc,
+                active,
+                false,
+                None,
+                p,
+                cx,
+                crate::icon_theme::FOLDER_NAMES,
             ));
         }
         // phones and cameras under This PC (issue 49: "The phone also doesn't show up as a location in sidebar"); they are no roots of

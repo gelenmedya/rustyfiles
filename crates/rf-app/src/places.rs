@@ -46,6 +46,17 @@ pub struct Recent {
     pub is_dir: bool,
 }
 
+/// Adds `path` to the sidebar's Drives section, or takes it out when it is there (issue 408).
+pub fn toggle_drive_place(path: PathBuf, cx: &mut gpui_kit::App) {
+    crate::settings::update(cx, |s| {
+        if let Some(i) = s.drive_places.iter().position(|p| *p == path) {
+            s.drive_places.remove(i);
+        } else {
+            s.drive_places.push(path);
+        }
+    });
+}
+
 /// How many recent items Home lists (14 until 1.0.2; the user: longer).
 const RECENT_SHOWN: usize = 30;
 

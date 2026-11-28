@@ -321,6 +321,13 @@ impl FolderView {
             let d = target_dir.clone();
             v.push(Item::action(t!("Kenar çubuğuna sabitle"), icon(L::Pin), act(me, move |v, _, cx| v.pin(d.clone(), cx))));
         }
+        // a folder of the user's own in the sidebar's Drives section (issue 408)
+        if single_dir && crate::archive_view::split(&target_dir).is_none() && target_dir.parent().is_some() {
+            let d = target_dir.clone();
+            let listed = cx.global::<crate::settings::Settings>().drive_places.contains(&d);
+            let label = if listed { t!("Sürücüler bölümünden kaldır") } else { t!("Sürücüler bölümüne ekle") };
+            v.push(Item::action(label, icon(L::HardDrive), move |_, cx| crate::places::toggle_drive_place(d.clone(), cx)));
+        }
         if single_dir && crate::archive_view::split(&target_dir).is_none() {
             let d = target_dir.clone();
             let label = match crate::aliases::name_of(&d) {

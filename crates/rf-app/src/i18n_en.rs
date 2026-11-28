@@ -126,6 +126,8 @@ pub const EN: &[(&str, &str)] = &[
     ("Yapıştır\tCtrl+V", "Paste\tCtrl+V"),
     ("Dosya konumunu aç", "Open file location"),
     ("Yeni sekmede aç", "Open in new tab"),
+    ("Sürücüler bölümüne ekle", "Add to the Drives section"),
+    ("Sürücüler bölümünden kaldır", "Remove from the Drives section"),
     ("Kenar çubuğuna sabitle", "Pin to sidebar"),
     ("Yolu kopyala\tCtrl+Shift+C", "Copy path\tCtrl+Shift+C"),
     ("Toplu yeniden adlandır…\tF2", "Bulk rename…\tF2"),

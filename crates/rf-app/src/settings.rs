@@ -524,6 +524,10 @@ pub struct Settings {
     pub explorer_sidebar_width: Option<f32>,
     /// Sidebar sections the user turned off ("drives", "cloud", "libraries", "network", "tags").
     pub sidebar_hidden: Vec<String>,
+    /// Folders of the user's own listed in the sidebar's Drives section after the drives (issue 408: a folder a phone is synced to,
+    /// a share used every day).
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub drive_places: Vec<std::path::PathBuf>,
     /// Sections of the Home page that are hidden: "quick", "drives", "devices", "tags",
     /// "network", "recent".
     pub home_hidden: Vec<String>,
@@ -1029,6 +1033,7 @@ impl Default for Settings {
             sidebar_width: DEFAULT_SIDEBAR_WIDTH,
             explorer_sidebar_width: None,
             sidebar_hidden: Vec::new(),
+            drive_places: Vec::new(),
             home_hidden: Vec::new(),
             recent_cleared_ms: 0,
             search_history: Vec::new(),
