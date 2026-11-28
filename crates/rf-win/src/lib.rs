@@ -26,6 +26,7 @@ pub mod dialogs;
 pub mod diskusage;
 pub mod elf;
 pub mod dnd;
+pub mod lockers;
 pub mod dock;
 pub mod docs;
 pub mod drives;

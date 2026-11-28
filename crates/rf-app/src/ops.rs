@@ -222,6 +222,33 @@ impl FolderView {
     }
 
     /// Ctrl+Shift+C: plain paths, one per line (Ctrl+Alt+C: with quotes, see `copy_path_with`).
+    /// "Kullanan programlar": which programs hold the selected items open (Windows' Restart Manager, see `rf_win::lockers`), told in a
+    /// notice. The usual reason a delete or a move says another program uses a file; asked here, the program is named (a Discord
+    /// request, 2026-11-28).
+    pub fn show_lockers(&mut self, paths: Vec<PathBuf>, window: &mut Window, cx: &mut Context<Self>) {
+        if paths.is_empty() {
+            return;
+        }
+        cx.spawn_in(window, async move |_, cx| {
+            let found = cx.background_spawn(async move { rf_win::lockers::who_holds(&paths) }).await;
+            let _ = cx.update(|window, cx| {
+                let (title, text) = match found {
+                    Ok(list) if list.is_empty() => (t!("Kullanan program yok"), t!("Bu öğeleri şu anda açık tutan bir program yok.").to_string()),
+                    Ok(list) => (
+                        t!("Bu öğeleri kullanan programlar"),
+                        list.iter().map(|l| if l.name.is_empty() { format!("PID {}", l.pid) } else { format!("{}  (PID {})", l.name, l.pid) }).collect::<Vec<_>>().join("\n"),
+                    ),
+                    Err(e) => {
+                        log::warn!("lockers: {e:#}");
+                        (t!("Kullanan programlar"), t!("Windows bunu şu anda söyleyemedi.").to_string())
+                    }
+                };
+                crate::prompt::notice(title, text, window, cx);
+            });
+        })
+        .detach();
+    }
+
     pub fn copy_path(&mut self, cx: &mut Context<Self>) {
         self.copy_path_with(false, cx)
     }

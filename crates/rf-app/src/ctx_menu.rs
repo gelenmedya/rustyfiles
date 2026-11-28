@@ -299,6 +299,9 @@ impl FolderView {
         }
         if !in_archive {
             v.push(Item::action(t!("Çoğalt"), icon(L::CopyPlus), act(me, |v, _, cx| v.duplicate_selected(cx))).hint("Ctrl+Alt+D"));
+            // which programs hold these open (the reason a delete or a move says another program uses a file)
+            let held = items.to_vec();
+            v.push(Item::action(t!("Kullanan programlar"), icon(L::Lock), act(me, move |v, w, cx| v.show_lockers(held.clone(), w, cx))));
         }
         if mp.create_shortcut && !in_archive {
             let link_items = items.to_vec();
