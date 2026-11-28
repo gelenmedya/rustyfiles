@@ -109,7 +109,9 @@ fn drag_out_allowing(owner: HWND, ui_thread: u32, items: &[PathBuf], allowed: DR
         let me = GetCurrentThreadId();
         let attached = ui_thread != 0 && AttachThreadInput(me, ui_thread, true).as_bool();
         let serial = DRAGS.fetch_add(1, Ordering::SeqCst) + 1;
+        DRAGGING.store(true, Ordering::SeqCst);
         let r = SHDoDragDrop(Some(owner), &data, None, allowed);
+        DRAGGING.store(false, Ordering::SeqCst);
         if attached {
             let _ = AttachThreadInput(me, ui_thread, false);
         }
@@ -120,6 +122,20 @@ fn drag_out_allowing(owner: HWND, ui_thread: u32, items: &[PathBuf], allowed: DR
 
 /// The drags started so far (each one's number lets a late clean-up see that a newer drag has begun meanwhile).
 static DRAGS: AtomicU32 = AtomicU32::new(0);
+/// A drag of ours is running now (its picture belongs on the screen).
+static DRAGGING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Hides a drag picture left on the screen when no drag of ours runs: the app calls it on a click in its windows and when one comes to
+/// the front. Issue 80: switching windows with Alt+Tab in the middle of a drag (into a browser) could leave the picture after every
+/// clean-up at the drag's end, until rustyfiles was restarted; now the next click or the next time rustyfiles is in front puts it away.
+pub fn sweep_drag_images() {
+    if !DRAGGING.load(Ordering::SeqCst) {
+        let n = hide_drag_images();
+        if n > 0 {
+            log::info!("dnd: hid {n} drag picture(s) left on the screen after a drag");
+        }
+    }
+}
 
 /// The picture that follows the pointer in a drag is a window of the shell's (class `SysDragImage`), made in the process that started
 /// the drag; the drop target under the pointer is the one that hides it when the drag leaves it or ends. When a target never does
@@ -129,10 +145,18 @@ static DRAGS: AtomicU32 = AtomicU32::new(0);
 /// may still be finishing its own animation), unless another drag has begun by then.
 fn put_away_drag_images(serial: u32) {
     hide_drag_images();
+    // (again a moment later, and later still: after a switch of windows mid-drag the shell may show the picture again once the drop
+    // has been handled, issue 80)
     std::thread::spawn(move || {
-        std::thread::sleep(Duration::from_millis(600));
-        if DRAGS.load(Ordering::SeqCst) == serial {
-            hide_drag_images();
+        for wait in [600u64, 1400, 3000] {
+            std::thread::sleep(Duration::from_millis(wait));
+            if DRAGS.load(Ordering::SeqCst) != serial || DRAGGING.load(Ordering::SeqCst) {
+                return;
+            }
+            let n = hide_drag_images();
+            if n > 0 {
+                log::info!("dnd: hid {n} drag picture(s) still on the screen {wait} ms into the clean-up");
+            }
         }
     });
 }

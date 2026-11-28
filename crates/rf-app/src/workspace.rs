@@ -939,7 +939,11 @@ impl Workspace {
             cx.notify();
         })
         .detach();
-        cx.observe_window_activation(window, |_: &mut Self, _, cx| {
+        cx.observe_window_activation(window, |_: &mut Self, window, cx| {
+            // (a drag picture left on the screen after a drag goes when rustyfiles comes to the front: issue 80)
+            if window.is_window_active() {
+                rf_win::dnd::sweep_drag_images();
+            }
             if crate::settings::windows_file_explorer_theme() {
                 cx.notify();
             }
@@ -6020,6 +6024,8 @@ impl Render for Workspace {
 
         v_flex()
             .id("workspace")
+            // (and on any click in the window: issue 80)
+            .capture_any_mouse_down(|_, _, _| rf_win::dnd::sweep_drag_images())
             .size_full()
             .bg(p.window_bg)
             .text_color(p.text)
