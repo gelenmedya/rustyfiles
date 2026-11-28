@@ -323,7 +323,9 @@ pub fn shape(items: Vec<DockItem>, hide_places: bool, ignored: &str, divider: bo
         };
         let name = a.name.to_lowercase();
         ignored.iter().any(|i| {
+            // (a Store app has no program file to match: "spotify.exe" is matched by its name too)
             *i == name
+                || i.strip_suffix(".exe") == Some(name.as_str())
                 || file.as_deref().is_some_and(|f| f == i || f.strip_suffix(".exe") == Some(i.as_str()))
                 || a.key.ends_with(&format!("\\{i}"))
                 || a.key.ends_with(&format!("\\{i}.exe"))
@@ -421,6 +423,18 @@ mod shape_tests {
         assert_eq!(names(&shape(items(), false, "chrome.exe; SPOTIFY", false)), ["Code", "|", "RecycleBin", "Downloads"], "by file name or by name");
         assert_eq!(names(&shape(items(), true, "chrome", true)), ["Code", "|", "Spotify"], "a line between the pinned and the running");
         assert_eq!(names(&shape(items(), true, "spotify, chrome", true)), ["Code"], "no running app left: no line");
+        let store = || {
+            vec![DockItem::App(DockApp {
+                key: "SpotifyAB.SpotifyMusic_zpdnekdrzrea0!Spotify".into(),
+                name: "Spotify".into(),
+                pinned: true,
+                launch: Some(Launch::Packaged("SpotifyAB.SpotifyMusic_zpdnekdrzrea0!Spotify".into())),
+                icon: IconSource::Window(0),
+                windows: Vec::new(),
+                active: false,
+            })]
+        };
+        assert!(shape(store(), true, "Spotify.exe", false).is_empty(), "a Store app by the program name people know");
     }
 }
 
