@@ -1047,6 +1047,16 @@ fn general(p: &Palette, s: &Settings, cx: &mut App) -> Vec<AnyElement> {
         Some(t!("Kapalıyken diğer uygulamaların öğeleri menünün sonunda listelenir.")),
         sw("shell-sub", p, s.menu.shell_submenu, |s, v| s.menu.shell_submenu = v),
     ));
+    // Windows' pictures in the menus without the rest of the Explorer look (issue 407); in that look they are there already
+    if !s.windows_file_explorer_theme {
+        v.push(card(
+            p,
+            L::Image,
+            t!("Menülerde Windows simgeleri"),
+            Some(t!("Sağ tık menülerinde Windows Dosya Gezgini'nin simgeleri, görünümün geri kalanı değişmeden")),
+            sw("menu-win-icons", p, s.menu_windows_icons, |s, v| s.menu_windows_icons = v),
+        ));
+    }
     v.push(card(
         p,
         L::ListFilter,
@@ -2120,6 +2130,14 @@ fn appearance(p: &Palette, s: &Settings, cx: &mut App) -> Vec<AnyElement> {
                     switch("tb-win-icons", &pp, windows_icons, move |_, cx| settings::update(cx, |s| s.toolbar_windows_icons = !windows_icons)),
                 ));
             }
+            // the pictures in the accent colour (issue 413)
+            let accent_icons = s.toolbar_accent_icons;
+            rows.push(sub(
+                &pp,
+                t!("Simgeler vurgu renginde"),
+                Some(t!("Araç çubuğunun simgeleri Windows'un vurgu renginde, Files'taki gibi")),
+                switch("tb-accent-icons", &pp, accent_icons, move |_, cx| settings::update(cx, |s| s.toolbar_accent_icons = !accent_icons)),
+            ));
             // the left group in its order, lines included
             for (i, name) in bar_order.iter().enumerate() {
                 if name == SEP {

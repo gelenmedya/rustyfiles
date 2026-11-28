@@ -3471,6 +3471,8 @@ impl Workspace {
         let looks = cx.global::<crate::settings::Settings>().toolbar_look.clone();
         let look = |name: &str| crate::toolbar_layout::look_of(&looks, name);
         let preview_icon = toolbar_icon(L::PanelRight);
+        // (the pictures in the accent colour, as Files has them: issue 413)
+        let accent_icons = cx.global::<crate::settings::Settings>().toolbar_accent_icons;
         // only while the folder is shown in groups (issue 181)
         let (has_groups, all_folded) = (tab.has_groups(), tab.all_groups_folded());
 
@@ -3493,7 +3495,7 @@ impl Workspace {
                         .active(|s| s.bg(p.pressed))
                         .on_click(cx.listener(move |this, _, window, cx| run(this, window, cx)))
                 })
-                .when(look.icon(), |d| d.child(toolbar_icon(icon)))
+                .when(look.icon(), |d| d.child(div().flex().when(accent_icons && enabled, |d| d.text_color(p.accent)).child(toolbar_icon(icon))))
                 .children(word.map(|w| div().whitespace_nowrap().child(w)))
         };
         let hidden_shown = self.active_tab().read(cx).filter.show_hidden;
@@ -3517,7 +3519,7 @@ impl Workspace {
                 .text_sm()
                 .text_color(if enabled { p.text } else { p.text_tertiary })
                 .when(!popups_open, |d| d.tooltip(move |w, cx| gpui_kit::component::tooltip::Tooltip::new(crate::i18n::t(tip)).build(w, cx)))
-                .when(look.icon(), |d| d.child(toolbar_icon(icon)))
+                .when(look.icon(), |d| d.child(div().flex().when(accent_icons && enabled, |d| d.text_color(p.accent)).child(toolbar_icon(icon))))
                 .children(label.map(|l| div().whitespace_nowrap().child(l)))
                 // (Explorer's "See more" has no arrow, issue 229; nor with Windows' pictures in the other look, issue 403)
                 .when(!(windows_icons && id == "cb-more"), |d| d.child(div().text_color(p.text_secondary).child(toolbar_icon(L::ChevronDown))))
@@ -3781,7 +3783,7 @@ impl Workspace {
                     .when(!filter_on, |d| d.hover(|s| s.bg(p.hover)))
                     .when(in_folder, |d| d.on_click(cx.listener(|this, _, window, cx| this.toggle_filter_bar(window, cx))))
                     .when(!in_folder, |d| d.text_color(p.text_tertiary))
-                    .child(toolbar_icon(L::ListFilter))
+                    .child(div().flex().when(accent_icons, |d| d.text_color(p.accent)).child(toolbar_icon(L::ListFilter)))
             }))
             .when(!windows_theme, |d| {
                 d.children(on("sort").then(|| drop("cb-sort", L::ArrowUpDown, None, "Sırala ve gruplandır", in_folder, look("sort"), cx, |_, _| crate::ctx_menu::BarMenu::Sort)))
@@ -3802,7 +3804,7 @@ impl Workspace {
                     .tooltip(|w, cx| gpui_kit::component::tooltip::Tooltip::new(t!("Önizleme bölmesi  (Alt+P)")).build(w, cx))
                     .when(preview_open, |d| d.bg(p.selection).text_color(p.accent))
                     .when(!preview_open, |d| d.hover(|s| s.bg(p.hover)))
-                    .child(preview_icon)
+                    .child(div().flex().when(accent_icons, |d| d.text_color(p.accent)).child(preview_icon))
                     .on_click(cx.listener(|this, _, _, cx| {
                         this.toggle_preview(cx);
                     }))

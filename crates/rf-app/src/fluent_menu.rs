@@ -163,6 +163,8 @@ pub struct MenuView {
     liquid: bool,
     /// File-list context menus use Explorer-style icons when that theme is enabled.
     explorer_context: bool,
+    /// Windows' own glyphs for the menu's pictures: in the Explorer look, or asked for on their own (issue 407).
+    windows_icons: bool,
     background: WindowBackgroundAppearance,
     /// Some popups borrow the Explorer surface while keeping the app's original icons.
     original_icons: bool,
@@ -278,6 +280,7 @@ fn show_ex(
         popup: None,
         liquid,
         explorer_context,
+        windows_icons: explorer_context || cx.global::<crate::settings::Settings>().menu_windows_icons,
         background,
         original_icons,
         glides: RefCell::new(BTreeMap::new()),
@@ -676,7 +679,7 @@ fn capsule_target(hl: Option<(usize, usize)>, open: &[usize], lv: usize, items: 
 }
 
 /// A list without separators at its ends or two in a row (what is left when a row between them goes).
-fn without_stray_separators(items: Vec<Item>) -> Vec<Item> {
+pub(crate) fn without_stray_separators(items: Vec<Item>) -> Vec<Item> {
     let mut out: Vec<Item> = Vec::with_capacity(items.len());
     for it in items {
         if matches!(it, Item::Separator) && out.last().is_none_or(|l| matches!(l, Item::Separator)) {
@@ -916,7 +919,7 @@ impl MenuView {
             let run = q.run.clone();
             let tip = q.tip.clone();
             let icon = q.icon;
-            let tint = (!self.original_icons && self.explorer_context).then(|| explorer_icon_color(icon, p.dark)).flatten();
+            let tint = (!self.original_icons && self.windows_icons).then(|| explorer_icon_color(icon, p.dark)).flatten();
             row = row.child(
                 div()
                     .id(("mq", i))
@@ -936,7 +939,7 @@ impl MenuView {
                     })
                     .child(if self.original_icons {
                         Icon::new(q.icon).size(px(16.)).into_any_element()
-                    } else if self.explorer_context {
+                    } else if self.windows_icons {
                         lucide_menu_icon(icon, true, false, tint)
                     } else {
                         Icon::new(q.icon).size(px(16.)).into_any_element()
@@ -1013,7 +1016,7 @@ impl MenuView {
                         enabled,
                         liquid::tick_slot(column, *checked),
                         p,
-                        self.explorer_context,
+                        self.windows_icons,
                         self.original_icons,
                     )
                 } else {
@@ -1025,7 +1028,7 @@ impl MenuView {
                         enabled,
                         liquid::TickSlot::None,
                         p,
-                        self.explorer_context,
+                        self.windows_icons,
                         self.original_icons,
                     )
                 };
@@ -1063,7 +1066,7 @@ impl MenuView {
                     true,
                     liquid::tick_slot(column, false),
                     p,
-                    self.explorer_context,
+                    self.windows_icons,
                     self.original_icons,
                 ))
                 .into_any_element(),

@@ -551,6 +551,10 @@ pub struct Settings {
     pub toolbar_icon_size: ToolbarIconSize,
     /// The command bar's pictures are Windows' own (the Explorer look's) in the other look too (issue 382). Off.
     pub toolbar_windows_icons: bool,
+    /// The command bar's pictures in the accent colour, as Files draws them (issue 413). Off.
+    pub toolbar_accent_icons: bool,
+    /// Windows File Explorer's pictures in the context menus without the rest of its look (issue 407). Off.
+    pub menu_windows_icons: bool,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub toolbar_commands: Vec<crate::quick_commands::QuickCommand>,
     pub preview_width: f32,
@@ -1033,6 +1037,8 @@ impl Default for Settings {
             toolbar_look: Vec::new(),
             toolbar_icon_size: ToolbarIconSize::Medium,
             toolbar_windows_icons: false,
+            toolbar_accent_icons: false,
+            menu_windows_icons: false,
             toolbar_extra: Vec::new(),
             toolbar_commands: Vec::new(),
             preview_width: 300.,

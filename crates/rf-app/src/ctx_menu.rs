@@ -797,54 +797,70 @@ impl FolderView {
             BarMenu::More => {
                 let (undo, redo) = crate::undo::next_labels();
                 let none = self.selected.is_empty();
-                vec![
-                    Item::action(
+                // A command that stands on the toolbar as a button of its own is not asked for here a second time (issue 402), as
+                // Explorer's "See more" has only what its bar has no room for. (The bar hidden: all of them.)
+                let on_bar = {
+                    let st = cx.global::<crate::settings::Settings>();
+                    let (show, extra, hidden) = (st.show_toolbar, st.toolbar_extra.clone(), st.toolbar_hidden.clone());
+                    move |key: &str| {
+                        show && match key {
+                            // (on the bar unless hidden, in either look)
+                            "props" => !hidden.iter().any(|h| h == key),
+                            // (Settings as a button stands in the address row, which every page has)
+                            "settings" => extra.iter().any(|h| h == key),
+                            _ => extra.iter().any(|h| h == key),
+                        }
+                    }
+                };
+                let keyed: Vec<(&str, Item)> = vec![
+                    ("undo", Item::action(
                         undo_text(undo),
                         icon(L::Undo2),
                         move |_, cx| crate::undo::undo(cx),
                     )
                     .hint("Ctrl+Z")
-                    .enabled(undo.is_some()),
-                    Item::action(
+                    .enabled(undo.is_some())),
+                    ("redo", Item::action(
                         redo_text(redo),
                         icon(L::Redo2),
                         move |_, cx| crate::undo::redo(cx),
                     )
                     .hint("Ctrl+Y")
-                    .enabled(redo.is_some()),
-                    Item::Separator,
-                    Item::action(
+                    .enabled(redo.is_some())),
+                    ("", Item::Separator),
+                    ("selectall", Item::action(
                         t!("Tümünü seç"),
                         icon(L::SquareCheck),
                         act(&me, |v, _, cx| v.select_all_items(cx)),
                     )
-                    .hint("Ctrl+A"),
-                    Item::action(
+                    .hint("Ctrl+A")),
+                    ("selectnone", Item::action(
                         t!("Hiçbirini seçme"),
                         icon(L::Square),
                         act(&me, |v, _, cx| v.select_no_items(cx)),
                     )
-                    .enabled(!none),
-                    Item::action(
+                    .enabled(!none)),
+                    ("invertsel", Item::action(
                         t!("Seçimi tersine çevir"),
                         icon(L::ArrowLeftRight),
                         act(&me, |v, _, cx| v.invert_selected_items(cx)),
-                    ),
-                    Item::Separator,
-                    Item::action(
+                    )),
+                    ("", Item::Separator),
+                    ("props", Item::action(
                         t!("Özellikler"),
                         icon(L::Wrench),
                         act(&me, |v, _, cx| v.folder_properties(cx)),
-                    ),
-                    Item::action(
+                    )),
+                    ("settings", Item::action(
                         t!("Ayarlar"),
                         icon(L::Settings),
                         |w, cx| w.dispatch_action(Box::new(crate::actions::GoSettings), cx),
                     )
-                    .hint("Ctrl+,"),
+                    .hint("Ctrl+,")),
                     // (closing the window leaves rustyfiles running with background mode or the Dock: issue 410)
-                    Item::action(t!("Çıkış"), icon(L::LogOut), |_, cx| cx.defer(crate::background::quit_all)),
-                ]
+                    ("", Item::action(t!("Çıkış"), icon(L::LogOut), |_, cx| cx.defer(crate::background::quit_all))),
+                ];
+                crate::fluent_menu::without_stray_separators(keyed.into_iter().filter(|(k, _)| k.is_empty() || !on_bar(k)).map(|(_, it)| it).collect())
             }
             BarMenu::Sort => {
                 // Files' layout: Sort ▸ / Group ▸, then the folder/file order; these apply to
