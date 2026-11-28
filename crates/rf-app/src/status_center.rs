@@ -947,6 +947,10 @@ fn transfer_inner(
                 }
             }
         }
+        // what came onto this PC from elsewhere (another drive, a phone, a share) is noted for Home's recent list (issue 421)
+        if comes_from_elsewhere(&sources, &top) {
+            crate::places::note_arrivals(&tops);
+        }
         *landed.lock().unwrap() = tops;
         if record && !pairs.is_empty() {
             *marker.lock().unwrap() = pairs.first().map(|(_, made)| made.clone());
@@ -955,6 +959,13 @@ fn transfer_inner(
         r
     }, on_done);
     set_extras(cx, id, Some(words), Some(open_dest), record.then_some(mark));
+}
+
+/// Whether a copy or a move brings things from another drive, a phone or a share onto `dest` (not just from one folder of the same
+/// drive to another). Pure.
+fn comes_from_elsewhere(sources: &[std::path::PathBuf], dest: &std::path::Path) -> bool {
+    let root = |p: &std::path::Path| p.components().next().map(|c| c.as_os_str().to_string_lossy().to_lowercase());
+    sources.iter().any(|s| is_shell_name(s) || root(s) != root(dest))
 }
 
 /// Words for the strip, a folder for the finished card to open, and the mark that tells the

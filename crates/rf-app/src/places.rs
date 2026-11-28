@@ -49,8 +49,112 @@ pub struct Recent {
 /// How many recent items Home lists (14 until 1.0.2; the user: longer).
 const RECENT_SHOWN: usize = 30;
 
-/// Windows' own "recent items" (%APPDATA%\Microsoft\Windows\Recent\*.lnk), newest first.
+/// The recent list of Home: Windows' own recent items, the files that came into Downloads lately, and what rustyfiles copied onto this
+/// PC (issue 421: "show also files you've recently downloaded or copied to the PC, like many Android file managers do"), newest first.
 fn load_recent(limit: usize) -> Vec<Recent> {
+    let mut all = windows_recent(limit);
+    all.extend(recent_downloads(limit));
+    all.extend(arrivals());
+    merge_recent(all, limit)
+}
+
+/// Newest first, each place once (the newest of its times), at most `limit`. Pure.
+fn merge_recent(mut all: Vec<Recent>, limit: usize) -> Vec<Recent> {
+    all.sort_by(|a, b| b.used_ms.cmp(&a.used_ms));
+    let mut out: Vec<Recent> = Vec::with_capacity(limit);
+    for r in all {
+        if !out.iter().any(|o| o.target == r.target) {
+            out.push(r);
+        }
+        if out.len() >= limit {
+            break;
+        }
+    }
+    out
+}
+
+/// How far back a download or an arrival still counts as recent.
+const ARRIVAL_DAYS: i64 = 14;
+
+fn ms_of(t: std::time::SystemTime) -> i64 {
+    t.duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis() as i64).unwrap_or(0)
+}
+
+/// The files that came into Downloads in the last [`ARRIVAL_DAYS`] days (by when they were made there), newest first. A download
+/// still being written (.crdownload, .part, .tmp) is left out.
+fn recent_downloads(limit: usize) -> Vec<Recent> {
+    let Some(dir) = rf_win::known::KnownFolder::Downloads.path() else { return Vec::new() };
+    let Ok(rd) = std::fs::read_dir(&dir) else { return Vec::new() };
+    let since = ms_of(std::time::SystemTime::now()) - ARRIVAL_DAYS * 86_400_000;
+    let mut out: Vec<Recent> = rd
+        .filter_map(|e| e.ok())
+        .filter_map(|e| {
+            let meta = e.metadata().ok()?;
+            let name = e.file_name().to_string_lossy().into_owned();
+            let ext = name.rsplit_once('.').map(|(_, x)| x.to_ascii_lowercase()).unwrap_or_default();
+            if meta.is_dir() || matches!(ext.as_str(), "crdownload" | "part" | "tmp" | "partial" | "download") || name.eq_ignore_ascii_case("desktop.ini") {
+                return None;
+            }
+            let at = ms_of(meta.created().or_else(|_| meta.modified()).ok()?);
+            (at >= since).then(|| Recent { name, target: e.path(), used_ms: at, is_dir: false })
+        })
+        .collect();
+    out.sort_by(|a, b| b.used_ms.cmp(&a.used_ms));
+    out.truncate(limit);
+    out
+}
+
+/// What rustyfiles copied onto this PC lately: the items that landed at the top of a copy's destination (`note_arrivals`), kept in
+/// `arrivals.json` of the settings folder, at most [`ARRIVALS_KEPT`].
+static ARRIVALS: std::sync::Mutex<Option<Vec<(PathBuf, i64)>>> = std::sync::Mutex::new(None);
+const ARRIVALS_KEPT: usize = 60;
+
+fn arrivals_file() -> Option<PathBuf> {
+    crate::settings::app_dir().map(|d| d.join("arrivals.json"))
+}
+
+fn with_arrivals<T>(f: impl FnOnce(&mut Vec<(PathBuf, i64)>) -> T) -> T {
+    let mut g = ARRIVALS.lock().unwrap_or_else(|e| e.into_inner());
+    let list = g.get_or_insert_with(|| {
+        arrivals_file().and_then(|p| std::fs::read_to_string(p).ok()).and_then(|t| serde_json::from_str::<Vec<(PathBuf, i64)>>(&t).ok()).unwrap_or_default()
+    });
+    f(list)
+}
+
+/// Notes items a copy brought onto this PC (from another drive, a phone, a share), for Home's recent list. Called by the copy when it
+/// has finished; the list is written at once (it is a few lines).
+pub fn note_arrivals(items: &[PathBuf]) {
+    if items.is_empty() {
+        return;
+    }
+    let now = ms_of(std::time::SystemTime::now());
+    let text = with_arrivals(|list| {
+        list.retain(|(p, _)| !items.contains(p));
+        list.extend(items.iter().map(|p| (p.clone(), now)));
+        list.sort_by(|a, b| b.1.cmp(&a.1));
+        list.truncate(ARRIVALS_KEPT);
+        serde_json::to_string(list).ok()
+    });
+    if let (Some(t), Some(p)) = (text, arrivals_file()) {
+        let _ = std::fs::write(p, t);
+    }
+}
+
+/// The noted arrivals still on the disk and still recent.
+fn arrivals() -> Vec<Recent> {
+    let since = ms_of(std::time::SystemTime::now()) - ARRIVAL_DAYS * 86_400_000;
+    let list = with_arrivals(|l| l.clone());
+    list.into_iter()
+        .filter(|(_, at)| *at >= since)
+        .filter_map(|(p, at)| {
+            let meta = std::fs::metadata(&p).ok()?;
+            Some(Recent { name: p.file_name()?.to_string_lossy().into_owned(), target: p, used_ms: at, is_dir: meta.is_dir() })
+        })
+        .collect()
+}
+
+/// Windows' own "recent items" (%APPDATA%\Microsoft\Windows\Recent\*.lnk), newest first.
+fn windows_recent(limit: usize) -> Vec<Recent> {
     let Some(dir) = dirs::data_dir().map(|d| d.join("Microsoft").join("Windows").join("Recent")) else {
         return Vec::new();
     };
@@ -469,6 +573,26 @@ pub fn pins_follow(cx: &mut App, from: &std::path::Path, to: Option<&std::path::
     let Some(list) = cx.global::<crate::settings::Settings>().pinned.clone() else { return };
     if let Some(next) = pins_after(&list, from, to) {
         crate::settings::update(cx, move |s| s.pinned = Some(next));
+    }
+}
+
+#[cfg(test)]
+mod recent_merge_tests {
+    use super::{Recent, merge_recent};
+    use std::path::PathBuf;
+
+    fn r(p: &str, at: i64) -> Recent {
+        Recent { name: p.into(), target: PathBuf::from(p), used_ms: at, is_dir: false }
+    }
+
+    /// Issue 421: downloads and copies join Windows' recent items: newest first, each place once, at most the limit.
+    #[test]
+    fn the_sources_are_merged_newest_first_once_each() {
+        let all = vec![r(r"C:\a.txt", 10), r(r"C:\dl\b.zip", 30), r(r"C:\a.txt", 50), r(r"D:\c.jpg", 20)];
+        let m = merge_recent(all, 2);
+        let names: Vec<&str> = m.iter().map(|x| x.target.to_str().unwrap()).collect();
+        assert_eq!(names, [r"C:\a.txt", r"C:\dl\b.zip"]);
+        assert_eq!(m[0].used_ms, 50, "a place's newest time");
     }
 }
 
