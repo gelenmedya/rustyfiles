@@ -1165,10 +1165,18 @@ impl Workspace {
     }
 
     /// Open/Save dialog: another file type chosen (1-based).
-    pub(crate) fn set_pick_filter(&mut self, ix: u32, _window: &mut Window, cx: &mut Context<Self>) {
+    pub(crate) fn set_pick_filter(&mut self, ix: u32, window: &mut Window, cx: &mut Context<Self>) {
         let Some(pk) = self.picker.clone() else { return };
+        let before = pk.patterns();
         pk.filter_ix.set(ix);
         let patterns = pk.patterns();
+        // Save: the name's extension follows the chosen type, as in Windows' own dialog (issue 424)
+        if pk.req.mode == rustyfiles_dialog::proto::Mode::Save {
+            let typed = pk.name.read(cx).value().to_string();
+            if let Some(name) = crate::picker::renamed_for_type(&typed, &before, &patterns) {
+                pk.name.update(cx, |st, cx| st.set_value(name, window, cx));
+            }
+        }
         for t in &self.tabs {
             for v in std::iter::once(&t.left).chain(t.right.as_ref()) {
                 v.update(cx, |v, cx| v.set_picking(patterns.clone(), pk.folders_only(), cx));

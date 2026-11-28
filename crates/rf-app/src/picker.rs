@@ -493,6 +493,25 @@ fn resolve(dir: Option<&Path>, name: &str) -> Option<PathBuf> {
     dir.map(|d| d.join(name))
 }
 
+/// The extension a typed name without one gets when saving: the chosen file type's (issue 424: "JPEG" chosen and "photo" typed
+/// came back as photo.png, the app's default), else the app's default, else none ("All files").
+pub(crate) fn save_ext(spec: &str, default_ext: &str) -> Option<String> {
+    first_ext(spec).or_else(|| (!default_ext.is_empty()).then(|| default_ext.to_string()))
+}
+
+/// The name box's text after the file type changed from `old` to `new`, as Windows' own dialog does it: a name ending in one of the
+/// old type's extensions gets the new type's first one ("photo.png" → "photo.jpg"). `None`: the text stays (no extension, one of
+/// another type, or a type with no extension of its own such as "All files").
+pub(crate) fn renamed_for_type(name: &str, old: &str, new: &str) -> Option<String> {
+    let to = first_ext(new)?;
+    let (stem, ext) = name.rsplit_once('.')?;
+    if stem.is_empty() || ext.eq_ignore_ascii_case(&to) {
+        return None;
+    }
+    let of_old = old.split(';').map(str::trim).filter_map(|p| p.strip_prefix("*.")).any(|e| e.eq_ignore_ascii_case(ext));
+    of_old.then(|| format!("{stem}.{to}"))
+}
+
 /// Keeps the name box in step with the selection (files when opening or saving, a folder when
 /// picking one).
 fn sync_name(ws: &Workspace, s: &PickSession, window: &mut Window, cx: &mut App) {
@@ -619,7 +638,7 @@ pub(crate) fn accept(ws: &mut Workspace, window: &mut Window, cx: &mut Context<W
                 return navigate(ws, target, window, cx);
             }
             if target.extension().is_none() {
-                let ext = if s.req.default_ext.is_empty() { first_ext(&s.patterns()) } else { Some(s.req.default_ext.clone()) };
+                let ext = save_ext(&s.patterns(), &s.req.default_ext);
                 if let Some(ext) = ext {
                     target.set_extension(ext);
                 }
@@ -760,7 +779,21 @@ pub(crate) fn footer(ws: &mut Workspace, s: &Rc<PickSession>, p: &Palette, windo
 #[cfg(test)]
 mod tests {
     // not `super::*`: gpui's `test` macro would shadow the built-in one
-    use super::{folder_choice, names_text, parse_names, resolve};
+    use super::{folder_choice, names_text, parse_names, renamed_for_type, resolve, save_ext};
+
+    /// Issue 424: the chosen file type decides the extension, as in Windows' own dialog.
+    #[test]
+    fn the_chosen_file_type_gives_the_extension() {
+        assert_eq!(save_ext("*.jpg;*.jpeg", "png").as_deref(), Some("jpg"), "the chosen type over the app's default");
+        assert_eq!(save_ext("*.*", "png").as_deref(), Some("png"), "All files: the app's default");
+        assert_eq!(save_ext("*.*", ""), None);
+        assert_eq!(renamed_for_type("photo.png", "*.png", "*.jpg;*.jpeg").as_deref(), Some("photo.jpg"));
+        assert_eq!(renamed_for_type("photo.PNG", "*.png", "*.jpg").as_deref(), Some("photo.jpg"));
+        assert_eq!(renamed_for_type("photo", "*.png", "*.jpg"), None, "no extension: it is added when saving");
+        assert_eq!(renamed_for_type("notes.txt", "*.png", "*.jpg"), None, "an extension of another type stays");
+        assert_eq!(renamed_for_type("photo.png", "*.png", "*.*"), None, "All files has no extension of its own");
+        assert_eq!(renamed_for_type("my.photo.png", "*.png", "*.webp").as_deref(), Some("my.photo.webp"));
+    }
     use std::path::{Path, PathBuf};
 
     #[test]
