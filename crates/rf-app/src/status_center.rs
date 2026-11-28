@@ -52,6 +52,9 @@ pub struct OpState {
     bytes: Arc<ByteProgress>,
     /// What the status bar's strip says while it runs ("12 öğe kopyalanıyor: Belgeler"); the title when `None`.
     words: Option<String>,
+    /// The names of the items it works on, for its card's tooltip when there are several (issue 296: "aaaa + 6 more" told
+    /// which seven files only of the first).
+    names: Vec<String>,
     /// The user sent its card / strip away (a failure stays up until then).
     dismissed: bool,
     /// Its card is folded to a one-line pill.
@@ -99,6 +102,7 @@ impl OpState {
             stats: OpStats::default(),
             bytes,
             words: None,
+            names: Vec::new(),
             dismissed: false,
             collapsed: false,
             question: None,
@@ -925,6 +929,7 @@ fn transfer_inner(
     let open_dest = dest.clone();
     let mark = Arc::new(std::sync::Mutex::new(None::<std::path::PathBuf>));
     let marker = mark.clone();
+    let listed = sources.clone();
     let id = start_with_id(cx, title, move |t| {
         let _arriving = Arriving::begin(&dest);
         t.set_verify(verify);
@@ -959,6 +964,7 @@ fn transfer_inner(
         r
     }, on_done);
     set_extras(cx, id, Some(words), Some(open_dest), record.then_some(mark));
+    set_names(cx, id, &listed);
 }
 
 /// Whether a copy or a move brings things from another drive, a phone or a share onto `dest` (not just from one folder of the same
@@ -981,6 +987,42 @@ pub fn set_extras(cx: &mut App, id: u64, words: Option<String>, open_dest: Optio
         cx.notify();
     });
 }
+
+/// Gives operation `id` the names of the items it works on (its card's tooltip lists them when there are several).
+pub fn set_names(cx: &mut App, id: u64, paths: &[std::path::PathBuf]) {
+    if paths.len() < 2 {
+        return;
+    }
+    let names: Vec<String> = paths.iter().map(|p| rf_core::history::display_name(p)).collect();
+    let Some(entity) = cx.try_global::<OpsGlobal>().map(|g| g.0.clone()) else { return };
+    entity.update(cx, |ops, _| {
+        if let Some(op) = ops.ops.iter_mut().find(|o| o.id == id) {
+            op.names = names;
+        }
+    });
+}
+
+/// The tooltip of a card's title: the title, and under it the items' names one a line (at most [`NAMES_SHOWN`], then how many
+/// more). Pure.
+fn title_tooltip(title: &str, names: &[String]) -> String {
+    if names.len() < 2 {
+        return title.to_string();
+    }
+    let mut out = String::from(title);
+    for n in names.iter().take(NAMES_SHOWN) {
+        out.push('\n');
+        out.push_str("• ");
+        out.push_str(n);
+    }
+    if names.len() > NAMES_SHOWN {
+        out.push('\n');
+        out.push_str(&t!("ve {n} öğe daha").replace("{n}", &(names.len() - NAMES_SHOWN).to_string()));
+    }
+    out
+}
+
+/// How many names a card's tooltip lists.
+const NAMES_SHOWN: usize = 20;
 
 /// A copy or move cut off by a crash or a shutdown: asked about once the main window is up
 /// (Resume / Discard / Later), one job at a time.
@@ -1316,6 +1358,7 @@ fn delete_inner(cx: &mut App, paths: Vec<std::path::PathBuf>, permanent: bool, r
     let fast = cx.global::<crate::settings::Settings>().fast_file_ops;
     let mark = Arc::new(std::sync::Mutex::new(None::<std::path::PathBuf>));
     let marker = mark.clone();
+    let listed = paths.clone();
     let id = start_with_id(cx, title, move |t| {
         // permanent: our parallel delete (the shell takes what it can't); recycle bin: the shell
         let r = if permanent && fast {
@@ -1333,6 +1376,7 @@ fn delete_inner(cx: &mut App, paths: Vec<std::path::PathBuf>, permanent: bool, r
     if record && !permanent {
         set_extras(cx, id, None, None, Some(mark));
     }
+    set_names(cx, id, &listed);
 }
 
 /// Title-bar button (top right, like Files): idle icon, a progress bar under it while work
@@ -1586,7 +1630,7 @@ fn render_op(ops: &Entity<Ops>, op: &OpState, p: &Palette) -> AnyElement {
                 // two lines and the whole text under the pointer: one line cut "Moving: a.txt + 1 more → Ne…" before the folder it
                 // goes to, and nothing showed the rest (issue 296)
                 .child({
-                    let whole = op.title.clone();
+                    let whole = title_tooltip(&op.title, &op.names);
                     div()
                         .id(("op-title", op.id as usize))
                         .text_sm()
@@ -1713,6 +1757,18 @@ fn fmt_duration_with(secs: f32, (sec, min, hour): (&str, &str, &str)) -> String 
 
 #[cfg(test)]
 mod tests {
+    /// Issue 296: several items' card lists their names under the pointer, not only the first and a count.
+    #[test]
+    fn a_cards_tooltip_names_every_item() {
+        let names: Vec<String> = (1..=3).map(|i| format!("f{i}.txt")).collect();
+        let tip = super::title_tooltip("Siliniyor: f1.txt ve 2 öğe daha", &names);
+        assert_eq!(tip.lines().count(), 4);
+        assert!(tip.contains("• f3.txt"));
+        assert_eq!(super::title_tooltip("bir", &names[..1]), "bir", "one item: the title alone");
+        let many: Vec<String> = (0..25).map(|i| i.to_string()).collect();
+        assert_eq!(super::title_tooltip("t", &many).lines().count(), 1 + super::NAMES_SHOWN + 1);
+    }
+
     use super::{Glance, OpPhase, OpState, Ops, Ordering, Question, fmt_duration_with, glance_of};
     use rf_core::transfer::{self as xfer, Stage};
     use rf_win::fastcopy::Resolve;
