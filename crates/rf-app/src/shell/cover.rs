@@ -275,6 +275,8 @@ pub fn shell_changed(cx: &mut App) {
             rf_win::desktop::bare::shell_changed();
         })
         .detach();
+    // (Explorer's desktop came or went: the left-out row is patched whole without it, under the round corners only with it)
+    sync_corner_patches(cx);
 }
 
 /// The display configuration changed (a monitor came or went, a resolution, a scale, a work area). The windows follow once the
@@ -527,10 +529,13 @@ fn reconcile(cx: &mut App) {
 /// radius is the setting's logical px at each monitor's own scale, as the view draws it.
 fn sync_corner_patches(cx: &mut App) {
     let radius = cx.try_global::<Settings>().map_or(0, |s| i32::from(s.desktop_corner_radius));
+    // with no Explorer's desktop under the covers the left-out row shows Windows' bare dark grey: the whole row is patched then
+    let bare = rf_win::desktop::bare::state_now() == rf_core::desktop::cover::bare::State::Bare;
     let Some(host) = cx.try_global::<CoverHost>() else { return };
     for w in &host.windows {
         let px = (radius as f32 * w.seen.scale_percent as f32 / 100.0).round() as i32;
-        rf_win::desktop::cornerpatch::set(w.hwnd, &corners::bottom_patches(w.seen.rect, px, TRIMMED_ROWS));
+        let rects = if bare { corners::bottom_rows(w.seen.rect, TRIMMED_ROWS) } else { corners::bottom_patches(w.seen.rect, px, TRIMMED_ROWS) };
+        rf_win::desktop::cornerpatch::set(w.hwnd, &rects);
     }
 }
 
