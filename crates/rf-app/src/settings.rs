@@ -547,6 +547,9 @@ pub struct Settings {
     /// default order.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub toolbar_order: Vec<String>,
+    /// The order of the bar's right group (filter, sort, view, preview: `toolbar_layout::right_order`, issue 405). Empty: the default.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub toolbar_right_order: Vec<String>,
     /// How each command bar button is shown, "name=icon|text|both" (`toolbar_layout::Look`, issue 374). A button not named here is
     /// drawn as it always was.
     #[serde(skip_serializing_if = "Vec::is_empty")]
@@ -1039,6 +1042,7 @@ impl Default for Settings {
             search_history: Vec::new(),
             toolbar_hidden: Vec::new(),
             toolbar_order: Vec::new(),
+            toolbar_right_order: Vec::new(),
             toolbar_look: Vec::new(),
             toolbar_icon_size: ToolbarIconSize::Medium,
             toolbar_windows_icons: false,

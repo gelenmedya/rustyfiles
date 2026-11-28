@@ -3488,7 +3488,7 @@ impl Workspace {
         // how each button is shown (picture, word or both: issue 374)
         let looks = cx.global::<crate::settings::Settings>().toolbar_look.clone();
         let look = |name: &str| crate::toolbar_layout::look_of(&looks, name);
-        let preview_icon = toolbar_icon(L::PanelRight);
+
         // (the pictures in the accent colour, as Files has them: issue 413)
         let accent_icons = cx.global::<crate::settings::Settings>().toolbar_accent_icons;
         // only while the folder is shown in groups (issue 181)
@@ -3787,7 +3787,13 @@ impl Workspace {
                         .child(Icon::new(if all_folded { L::ChevronsUpDown } else { L::ChevronsDownUp }).size(px(16.))),
                 )
             })
-            .children(on("filter").then(|| {
+            .children({
+                // the right group in the user's order (issue 405); Sort and View stand in the left group of the Explorer look
+                let order = crate::toolbar_layout::right_order(&cx.global::<crate::settings::Settings>().toolbar_right_order, windows_theme);
+                let mut els: Vec<AnyElement> = Vec::new();
+                for key in order {
+                    let el: Option<AnyElement> = match key.as_str() {
+                        "filter" => on("filter").then(|| {
                 div()
                     .id("cb-filter")
                     .h(px(32.))
@@ -3802,15 +3808,13 @@ impl Workspace {
                     .when(in_folder, |d| d.on_click(cx.listener(|this, _, window, cx| this.toggle_filter_bar(window, cx))))
                     .when(!in_folder, |d| d.text_color(p.text_tertiary))
                     .child(div().flex().when(accent_icons, |d| d.text_color(p.accent)).child(toolbar_icon(L::ListFilter)))
-            }))
-            .when(!windows_theme, |d| {
-                d.children(on("sort").then(|| drop("cb-sort", L::ArrowUpDown, None, "Sırala ve gruplandır", in_folder, look("sort"), cx, |_, _| crate::ctx_menu::BarMenu::Sort)))
-                    .children(on("view").then(|| {
-                        drop("cb-view", L::LayoutGrid, None, "Görünüm", true, look("view"), cx, move |this, _| crate::ctx_menu::BarMenu::View { dual: this.tabs[this.active].right.is_some(), shelf: this.shelf_open })
-                    }))
-            })
-            .children(on("preview").then(sep))
-            .children(on("preview").then(|| {
+                        .into_any_element()}),
+                        "sort" => (!windows_theme && on("sort")).then(|| drop("cb-sort", L::ArrowUpDown, None, "Sırala ve gruplandır", in_folder, look("sort"), cx, |_, _| crate::ctx_menu::BarMenu::Sort).into_any_element()),
+                        "view" => (!windows_theme && on("view")).then(|| {
+                            drop("cb-view", L::LayoutGrid, None, "Görünüm", true, look("view"), cx, move |this, _| crate::ctx_menu::BarMenu::View { dual: this.tabs[this.active].right.is_some(), shelf: this.shelf_open }).into_any_element()
+                        }),
+                        // (the line before it stays with it, wherever it stands)
+                        "preview" => on("preview").then(|| h_flex().items_center().child(sep()).child({
                 div()
                     .id("cb-preview")
                     .h(px(32.))
@@ -3822,11 +3826,17 @@ impl Workspace {
                     .tooltip(|w, cx| gpui_kit::component::tooltip::Tooltip::new(t!("Önizleme bölmesi  (Alt+P)")).build(w, cx))
                     .when(preview_open, |d| d.bg(p.selection).text_color(p.accent))
                     .when(!preview_open, |d| d.hover(|s| s.bg(p.hover)))
-                    .child(div().flex().when(accent_icons, |d| d.text_color(p.accent)).child(preview_icon))
+                    .child(div().flex().when(accent_icons, |d| d.text_color(p.accent)).child(toolbar_icon(L::PanelRight)))
                     .on_click(cx.listener(|this, _, _, cx| {
                         this.toggle_preview(cx);
                     }))
-            }))
+                        }).into_any_element()),
+                        _ => None,
+                    };
+                    els.extend(el);
+                }
+                els
+            })
             // (Settings, when it is a button of its own, stands in the address row: issue 399)
     }
 

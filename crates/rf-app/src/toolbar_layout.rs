@@ -52,6 +52,24 @@ pub fn order(saved: &[String], explorer: bool) -> Vec<String> {
     out
 }
 
+/// The right group's buttons in the ordinary look and in the Windows File Explorer look (there Sort and View stand in the left group).
+const RIGHT: [&str; 4] = ["filter", "sort", "view", "preview"];
+const RIGHT_EXPLORER: [&str; 2] = ["filter", "preview"];
+
+/// The right group's order (issue 405: "allow users to arrange the order of the items on the right side"): the saved names this look
+/// has, each once, then the ones the saved list does not name in their default order.
+pub fn right_order(saved: &[String], explorer: bool) -> Vec<String> {
+    let all: &[&str] = if explorer { &RIGHT_EXPLORER } else { &RIGHT };
+    let mut out: Vec<String> = saved.iter().filter(|n| all.contains(&n.as_str())).cloned().collect();
+    out.dedup();
+    for n in all {
+        if !out.iter().any(|o| o == n) {
+            out.push(n.to_string());
+        }
+    }
+    out
+}
+
 /// The order after the entry at `ix` moved one place up (towards the start) or down. Out of range: unchanged.
 pub fn moved(order: &[String], ix: usize, up: bool) -> Vec<String> {
     let mut v = order.to_vec();
@@ -159,6 +177,20 @@ pub fn icon_px(size: crate::settings::ToolbarIconSize) -> f32 {
         crate::settings::ToolbarIconSize::Small => 14.0,
         crate::settings::ToolbarIconSize::Medium => 16.0,
         crate::settings::ToolbarIconSize::Large => 20.0,
+    }
+}
+
+#[cfg(test)]
+mod right_order_tests {
+    use super::right_order;
+
+    #[test]
+    fn the_right_group_keeps_its_saved_order_and_gets_the_missing_buttons() {
+        let s = |v: &[&str]| v.iter().map(|x| x.to_string()).collect::<Vec<_>>();
+        assert_eq!(right_order(&[], false), s(&["filter", "sort", "view", "preview"]));
+        assert_eq!(right_order(&s(&["preview", "filter"]), false), s(&["preview", "filter", "sort", "view"]));
+        // a name the look has not is left out (Sort stands in the left group of the Explorer look)
+        assert_eq!(right_order(&s(&["sort", "preview"]), true), s(&["preview", "filter"]));
     }
 }
 

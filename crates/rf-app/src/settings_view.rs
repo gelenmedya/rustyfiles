@@ -2150,10 +2150,22 @@ fn appearance(p: &Palette, s: &Settings, cx: &mut App) -> Vec<AnyElement> {
                 let controls = h_flex().gap_2().items_center().child(look_box(key)).child(arrows(i)).child(shown_switch(key, id, optional));
                 rows.push(sub(&pp, crate::i18n::t(label), None, controls.into_any_element()));
             }
-            // the right group: shown or not, and the look of Sort and View (their place is fixed, as Explorer's)
-            for &(key, id, label, optional) in BUTTONS.iter().filter(|b| !bar_order.iter().any(|o| o == b.0)) {
-                let controls = h_flex().gap_2().items_center().when(matches!(key, "sort" | "view"), |d| d.child(look_box(key))).child(shown_switch(key, id, optional));
+            // the right group: shown or not, the look of Sort and View, and its order (issue 405)
+            let right = crate::toolbar_layout::right_order(&s.toolbar_right_order, explorer);
+            for (i, key) in right.iter().enumerate() {
+                let Some((key, id, label, optional)) = button_of(key) else { continue };
+                let (up, down) = (right.clone(), right.clone());
+                let set_right = |o: Vec<String>, cx: &mut App| settings::update(cx, move |s| s.toolbar_right_order = o);
+                let arrows = h_flex()
+                    .gap_1()
+                    .child(icon_button(("tb-r-up", i), &pp, L::ChevronUp, t!("Yukarı taşı"), move |_, cx| set_right(crate::toolbar_layout::moved(&up, i, true), cx)))
+                    .child(icon_button(("tb-r-down", i), &pp, L::ChevronDown, t!("Aşağı taşı"), move |_, cx| set_right(crate::toolbar_layout::moved(&down, i, false), cx)));
+                let controls = h_flex().gap_2().items_center().when(matches!(key, "sort" | "view"), |d| d.child(look_box(key))).child(arrows).child(shown_switch(key, id, optional));
                 rows.push(sub(&pp, crate::i18n::t(label), None, controls.into_any_element()));
+            }
+            // (the rest that is not in the left group: Settings as a button of its own, in the address row)
+            for &(key, id, label, optional) in BUTTONS.iter().filter(|b| !bar_order.iter().any(|o| o == b.0) && !right.iter().any(|r| r == b.0)) {
+                rows.push(sub(&pp, crate::i18n::t(label), None, h_flex().gap_2().items_center().child(shown_switch(key, id, optional)).into_any_element()));
             }
             let with_line = bar_order.clone();
             rows.push(sub(
@@ -2163,7 +2175,10 @@ fn appearance(p: &Palette, s: &Settings, cx: &mut App) -> Vec<AnyElement> {
                 h_flex()
                     .gap_2()
                     .child(button("tb-add-sep", &pp, t!("Ayırıcı ekle"), move |_, cx| set_order(crate::toolbar_layout::with_line(&with_line), cx)))
-                    .child(button("tb-reset-order", &pp, t!("Varsayılan sıra"), |_, cx| settings::update(cx, |s| s.toolbar_order.clear())))
+                    .child(button("tb-reset-order", &pp, t!("Varsayılan sıra"), |_, cx| settings::update(cx, |s| {
+                        s.toolbar_order.clear();
+                        s.toolbar_right_order.clear();
+                    })))
                     .into_any_element(),
             ));
             rows.extend(commands.into_iter().enumerate().map(|(i, command)| {
