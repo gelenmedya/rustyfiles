@@ -2233,5 +2233,22 @@
  "976b42f8": "Tilføj en separator",
  "4cc75906": "Standardrækkefølge",
  "4e935827": "Windows-ikoner",
- "a2e62d37": "Ikonerne fra Windows Stifinder på værktøjslinjen"
+ "a2e62d37": "Ikonerne fra Windows Stifinder på værktøjslinjen",
+ "f8634147": "Tilføj til afsnittet Drev",
+ "36613af3": "Fjern fra afsnittet Drev",
+ "bcb960f0": "Windows-ikoner i menuer",
+ "c2db7ff4": "Windows Stifinders ikoner i genvejsmenuerne, med resten af udseendet uændret",
+ "d4b35b70": "Ikoner i accentfarven",
+ "15cf593f": "Værktøjslinjens ikoner i Windows' accentfarve, som i Files",
+ "a506af59": "og {n} mere",
+ "96c3efbc": "Programmer der bruger det",
+ "1e4e844c": "Ingen program bruger det",
+ "13d0dbab": "Ingen program har disse elementer åbne lige nu.",
+ "f40b1002": "Programmer der bruger disse elementer",
+ "bf0c07d8": "Windows kan ikke oplyse dette lige nu.",
+ "8269ae1f": "Skjul Papirkurv og Downloads",
+ "080ceea7": "Ikonerne for Papirkurv og Downloads i slutningen af den midterste ø vises ikke.",
+ "76c2c559": "Skillelinje mellem fastgjorte og kørende apps",
+ "b8cd47d5": "En linje vises mellem de fastgjorte apps og de kørende apps, der ikke er fastgjorte.",
+ "bb4229cb": "Apps der ikke vises i docken (for eksempel chrome.exe, Spotify)"
 }

@@ -2233,5 +2233,22 @@
  "976b42f8": "Adaugă un separator",
  "4cc75906": "Ordine implicită",
  "4e935827": "Pictograme Windows",
- "a2e62d37": "Pictogramele Exploratorului de fișiere Windows în bara de instrumente"
+ "a2e62d37": "Pictogramele Exploratorului de fișiere Windows în bara de instrumente",
+ "f8634147": "Adaugă în secțiunea Unități",
+ "36613af3": "Elimină din secțiunea Unități",
+ "bcb960f0": "Pictograme Windows în meniuri",
+ "c2db7ff4": "Pictogramele Explorator de fișiere Windows din meniurile clic dreapta, restul aspectului rămânând neschimbat",
+ "d4b35b70": "Pictograme în culoarea de accent",
+ "15cf593f": "Pictogramele barei de instrumente în culoarea de accent a Windows, ca în Files",
+ "a506af59": "și încă {n}",
+ "96c3efbc": "Programe care le folosesc",
+ "1e4e844c": "Niciun program nu le folosește",
+ "13d0dbab": "Niciun program nu are deschise aceste elemente acum.",
+ "f40b1002": "Programe care folosesc aceste elemente",
+ "bf0c07d8": "Windows nu poate stabili acest lucru acum.",
+ "8269ae1f": "Ascunde Coșul de reciclare și Descărcările",
+ "080ceea7": "Pictogramele Coșul de reciclare și Descărcări de la capătul insulei din mijloc nu sunt afișate.",
+ "76c2c559": "Linie de separare între aplicațiile fixate și cele pornite",
+ "b8cd47d5": "Între aplicațiile fixate și aplicațiile pornite care nu sunt fixate se trasează o linie.",
+ "bb4229cb": "Aplicații care nu se afișează în dock (de exemplu chrome.exe, Spotify)"
 }

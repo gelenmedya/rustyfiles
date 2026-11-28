@@ -2233,5 +2233,22 @@
  "976b42f8": "Dodaj separator",
  "4cc75906": "Domyślna kolejność",
  "4e935827": "Ikony Windows",
- "a2e62d37": "Ikony Eksploratora plików Windows na pasku narzędzi"
+ "a2e62d37": "Ikony Eksploratora plików Windows na pasku narzędzi",
+ "f8634147": "Dodaj do sekcji Dyski",
+ "36613af3": "Usuń z sekcji Dyski",
+ "bcb960f0": "Ikony systemu Windows w menu",
+ "c2db7ff4": "Ikony Eksploratora plików Windows w menu kontekstowym, reszta wyglądu bez zmian",
+ "d4b35b70": "Ikony w kolorze akcentu",
+ "15cf593f": "Ikony paska narzędzi w kolorze akcentu systemu Windows, jak w Files",
+ "a506af59": "i {n} więcej",
+ "96c3efbc": "Programy korzystające z tego",
+ "1e4e844c": "Żaden program z tego nie korzysta",
+ "13d0dbab": "Żaden program nie ma teraz otwartych tych elementów.",
+ "f40b1002": "Programy korzystające z tych elementów",
+ "bf0c07d8": "System Windows nie może teraz tego ustalić.",
+ "8269ae1f": "Ukryj Kosz i Pobrane",
+ "080ceea7": "Ikony Kosza i Pobranych na końcu środkowej wyspy nie są pokazywane.",
+ "76c2c559": "Separator między przypiętymi a uruchomionymi aplikacjami",
+ "b8cd47d5": "Linia oddziela przypięte aplikacje od uruchomionych aplikacji, które nie są przypięte.",
+ "bb4229cb": "Aplikacje niepokazywane w docku (na przykład chrome.exe, Spotify)"
 }

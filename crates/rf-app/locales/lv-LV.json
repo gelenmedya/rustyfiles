@@ -2233,5 +2233,22 @@
  "976b42f8": "Pievienot atdalītāju",
  "4cc75906": "Noklusējuma secība",
  "4e935827": "Windows ikonas",
- "a2e62d37": "Windows failu pārlūka ikonas rīkjoslā"
+ "a2e62d37": "Windows failu pārlūka ikonas rīkjoslā",
+ "f8634147": "Pievienot sadaļai Diskdziņi",
+ "36613af3": "Noņemt no sadaļas Diskdziņi",
+ "bcb960f0": "Windows ikonas izvēlnēs",
+ "c2db7ff4": "Windows Failu pārlūka ikonas konteksta izvēlnēs; pārējais izskats paliek nemainīgs",
+ "d4b35b70": "Ikonas uzsvara krāsā",
+ "15cf593f": "Rīkjoslas ikonas Windows uzsvara krāsā, kā programmā Files",
+ "a506af59": "un vēl {n}",
+ "96c3efbc": "Programmas, kas to izmanto",
+ "1e4e844c": "Neviena programma to neizmanto",
+ "13d0dbab": "Šobrīd neviena programma nav atvērusi šos vienumus.",
+ "f40b1002": "Programmas, kas izmanto šos vienumus",
+ "bf0c07d8": "Windows šobrīd to nevar noteikt.",
+ "8269ae1f": "Slēpt Atkritni un Lejupielādes",
+ "080ceea7": "Atkritnes un Lejupielāžu ikonas doka vidusdaļas beigās netiek rādītas.",
+ "76c2c559": "Atdalītājs starp piespraustajām un darbībā esošajām lietotnēm",
+ "b8cd47d5": "Līnija tiek rādīta starp piespraustajām lietotnēm un darbībā esošajām lietotnēm, kas nav piespraustas.",
+ "bb4229cb": "Lietotnes, kas netiek rādītas dokā (piemēram, chrome.exe, Spotify)"
 }

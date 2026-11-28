@@ -2233,5 +2233,22 @@
  "976b42f8": "Pridėti skirtuką",
  "4cc75906": "Numatytoji tvarka",
  "4e935827": "Windows piktogramos",
- "a2e62d37": "Windows failų naršyklės piktogramos įrankių juostoje"
+ "a2e62d37": "Windows failų naršyklės piktogramos įrankių juostoje",
+ "f8634147": "Pridėti į diskų skyrių",
+ "36613af3": "Pašalinti iš diskų skyriaus",
+ "bcb960f0": "Windows piktogramos meniu",
+ "c2db7ff4": "Windows failų naršyklės piktogramos dešiniojo pelės klavišo meniu, likusi išvaizda nekeičiama",
+ "d4b35b70": "Piktogramos akcento spalva",
+ "15cf593f": "Įrankių juostos piktogramos Windows akcento spalva, kaip Files",
+ "a506af59": "ir dar {n}",
+ "96c3efbc": "Programos, kurios jį naudoja",
+ "1e4e844c": "Jo nenaudoja jokia programa",
+ "13d0dbab": "Šiuo metu jokia programa neturi atidarytų šių elementų.",
+ "f40b1002": "Programos, naudojančios šiuos elementus",
+ "bf0c07d8": "Windows šiuo metu negali to nustatyti.",
+ "8269ae1f": "Slėpti Šiukšlinę ir Atsisiuntimus",
+ "080ceea7": "Šiukšlinės ir atsisiuntimų piktogramos vidurinės salos gale nerodomos.",
+ "76c2c559": "Skirtukas tarp prisegtų ir veikiančių programų",
+ "b8cd47d5": "Tarp prisegtų programų ir veikiančių neprisegtų programų rodoma linija.",
+ "bb4229cb": "Programos, nerodomos doke (pavyzdžiui, chrome.exe, Spotify)"
 }

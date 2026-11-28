@@ -2233,5 +2233,22 @@
  "976b42f8": "Aggiungi un separatore",
  "4cc75906": "Ordine predefinito",
  "4e935827": "Icone di Windows",
- "a2e62d37": "Le icone di Esplora file di Windows nella barra degli strumenti"
+ "a2e62d37": "Le icone di Esplora file di Windows nella barra degli strumenti",
+ "f8634147": "Aggiungi alla sezione Dischi",
+ "36613af3": "Rimuovi dalla sezione Dischi",
+ "bcb960f0": "Icone di Windows nei menu",
+ "c2db7ff4": "Icone di Esplora file di Windows nei menu contestuali, con il resto dell'aspetto invariato",
+ "d4b35b70": "Icone nel colore di accento",
+ "15cf593f": "Le icone della barra degli strumenti nel colore di accento di Windows, come in Files",
+ "a506af59": "e altri {n}",
+ "96c3efbc": "Programmi che lo usano",
+ "1e4e844c": "Nessun programma lo sta usando",
+ "13d0dbab": "Nessun programma ha aperti questi elementi al momento.",
+ "f40b1002": "Programmi che usano questi elementi",
+ "bf0c07d8": "Al momento Windows non è in grado di verificarlo.",
+ "8269ae1f": "Nascondi Cestino e Download",
+ "080ceea7": "Le icone Cestino e Download alla fine dell'isola centrale non vengono mostrate.",
+ "76c2c559": "Separatore tra app fissate e app in esecuzione",
+ "b8cd47d5": "Una linea separa le app fissate dalle app in esecuzione che non sono fissate.",
+ "bb4229cb": "App non mostrate nel Dock (ad esempio chrome.exe, Spotify)"
 }

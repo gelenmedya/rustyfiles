@@ -2233,5 +2233,22 @@
  "976b42f8": "Añadir un separador",
  "4cc75906": "Orden predeterminado",
  "4e935827": "Iconos de Windows",
- "a2e62d37": "Los iconos del Explorador de archivos de Windows en la barra de herramientas"
+ "a2e62d37": "Los iconos del Explorador de archivos de Windows en la barra de herramientas",
+ "f8634147": "Añadir a la sección Unidades",
+ "36613af3": "Quitar de la sección Unidades",
+ "bcb960f0": "Iconos de Windows en los menús",
+ "c2db7ff4": "Iconos del Explorador de archivos de Windows en los menús contextuales, con el resto del aspecto sin cambios",
+ "d4b35b70": "Iconos en el color de énfasis",
+ "15cf593f": "Los iconos de la barra de herramientas en el color de énfasis de Windows, como en Files",
+ "a506af59": "y {n} más",
+ "96c3efbc": "Programas que lo usan",
+ "1e4e844c": "Ningún programa lo está usando",
+ "13d0dbab": "Ningún programa tiene abiertos estos elementos en este momento.",
+ "f40b1002": "Programas que usan estos elementos",
+ "bf0c07d8": "Windows no puede determinarlo en este momento.",
+ "8269ae1f": "Ocultar la Papelera de reciclaje y Descargas",
+ "080ceea7": "No se muestran los iconos de la Papelera de reciclaje y Descargas al final de la isla central.",
+ "76c2c559": "Separador entre aplicaciones ancladas y en ejecución",
+ "b8cd47d5": "Se muestra una línea entre las aplicaciones ancladas y las aplicaciones en ejecución que no están ancladas.",
+ "bb4229cb": "Aplicaciones que no se muestran en el Dock (por ejemplo chrome.exe, Spotify)"
 }

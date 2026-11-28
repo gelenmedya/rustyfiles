@@ -2233,5 +2233,22 @@
  "976b42f8": "Shto një ndarës",
  "4cc75906": "Rendi i parazgjedhur",
  "4e935827": "Ikonat e Windows",
- "a2e62d37": "Ikonat e Eksploruesit të skedarëve Windows në shiritin e veglave"
+ "a2e62d37": "Ikonat e Eksploruesit të skedarëve Windows në shiritin e veglave",
+ "f8634147": "Shto në seksionin Disqet",
+ "36613af3": "Hiq nga seksioni Disqet",
+ "bcb960f0": "Ikonat e Windows në menu",
+ "c2db7ff4": "Ikonat e File Explorer të Windows në menutë e klikimit të djathtë, ndërsa pjesa tjetër e pamjes mbetet e pandryshuar",
+ "d4b35b70": "Ikonat në ngjyrën theksuese",
+ "15cf593f": "Ikonat e shiritit të veglave në ngjyrën theksuese të Windows, si në Files",
+ "a506af59": "dhe {n} të tjera",
+ "96c3efbc": "Programet që e përdorin",
+ "1e4e844c": "Asnjë program nuk e përdor",
+ "13d0dbab": "Asnjë program nuk ka hapur këto elemente tani.",
+ "f40b1002": "Programet që përdorin këto elemente",
+ "bf0c07d8": "Windows nuk mund ta përcaktojë këtë tani.",
+ "8269ae1f": "Fshih Koshin e riciklimit dhe Shkarkimet",
+ "080ceea7": "Ikonat e Koshit të riciklimit dhe të Shkarkimeve në fund të ishullit të mesëm nuk shfaqen.",
+ "76c2c559": "Ndarës midis aplikacioneve të fiksuara dhe atyre që po ekzekutohen",
+ "b8cd47d5": "Një vijë vendoset midis aplikacioneve të fiksuara dhe aplikacioneve që po ekzekutohen e që nuk janë fiksuar.",
+ "bb4229cb": "Aplikacionet që nuk shfaqen në dock (për shembull chrome.exe, Spotify)"
 }

@@ -2233,5 +2233,22 @@
  "976b42f8": "Ajouter un séparateur",
  "4cc75906": "Ordre par défaut",
  "4e935827": "Icônes Windows",
- "a2e62d37": "Les icônes de l'Explorateur de fichiers Windows dans la barre d'outils"
+ "a2e62d37": "Les icônes de l'Explorateur de fichiers Windows dans la barre d'outils",
+ "f8634147": "Ajouter à la section Lecteurs",
+ "36613af3": "Retirer de la section Lecteurs",
+ "bcb960f0": "Icônes Windows dans les menus",
+ "c2db7ff4": "Icônes de l'Explorateur Windows dans les menus contextuels, le reste de l'apparence restant inchangé",
+ "d4b35b70": "Icônes en couleur d'accentuation",
+ "15cf593f": "Les icônes de la barre d'outils en couleur d'accentuation de Windows, comme dans Files",
+ "a506af59": "et {n} de plus",
+ "96c3efbc": "Programmes qui l'utilisent",
+ "1e4e844c": "Aucun programme ne l'utilise",
+ "13d0dbab": "Aucun programme n'a ces éléments ouverts pour le moment.",
+ "f40b1002": "Programmes utilisant ces éléments",
+ "bf0c07d8": "Windows ne peut pas le déterminer pour le moment.",
+ "8269ae1f": "Masquer la Corbeille et Téléchargements",
+ "080ceea7": "Les icônes de la Corbeille et de Téléchargements, à la fin de l'îlot central, ne sont pas affichées.",
+ "76c2c559": "Séparateur entre les applications épinglées et en cours d'exécution",
+ "b8cd47d5": "Une ligne sépare les applications épinglées des applications en cours d'exécution qui ne le sont pas.",
+ "bb4229cb": "Applications non affichées dans le Dock (par exemple chrome.exe, Spotify)"
 }

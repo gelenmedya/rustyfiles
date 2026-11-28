@@ -2233,5 +2233,22 @@
  "976b42f8": "Scheidingslijn toevoegen",
  "4cc75906": "Standaardvolgorde",
  "4e935827": "Windows-pictogrammen",
- "a2e62d37": "De pictogrammen van Windows Verkenner op de werkbalk"
+ "a2e62d37": "De pictogrammen van Windows Verkenner op de werkbalk",
+ "f8634147": "Toevoegen aan de sectie Stations",
+ "36613af3": "Verwijderen uit de sectie Stations",
+ "bcb960f0": "Windows-pictogrammen in menu's",
+ "c2db7ff4": "Pictogrammen van Windows Verkenner in de contextmenu's, met de rest van de weergave ongewijzigd",
+ "d4b35b70": "Pictogrammen in de accentkleur",
+ "15cf593f": "De pictogrammen van de werkbalk in de accentkleur van Windows, zoals in Files",
+ "a506af59": "en {n} meer",
+ "96c3efbc": "Programma's die het gebruiken",
+ "1e4e844c": "Geen enkel programma gebruikt het",
+ "13d0dbab": "Geen enkel programma heeft deze items nu geopend.",
+ "f40b1002": "Programma's die deze items gebruiken",
+ "bf0c07d8": "Windows kan dit op dit moment niet vaststellen.",
+ "8269ae1f": "Prullenbak en Downloads verbergen",
+ "080ceea7": "De pictogrammen Prullenbak en Downloads aan het eind van het middelste eiland worden niet getoond.",
+ "76c2c559": "Scheidingslijn tussen vastgemaakte en actieve apps",
+ "b8cd47d5": "Er komt een lijn tussen de vastgemaakte apps en de actieve apps die niet zijn vastgemaakt.",
+ "bb4229cb": "Apps die niet in het dock worden getoond (bijvoorbeeld chrome.exe, Spotify)"
 }

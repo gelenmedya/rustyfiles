@@ -2233,5 +2233,22 @@
  "976b42f8": "Afegeix un separador",
  "4cc75906": "Ordre per defecte",
  "4e935827": "Icones de Windows",
- "a2e62d37": "Les icones de l'Explorador de fitxers de Windows a la barra d'eines"
+ "a2e62d37": "Les icones de l'Explorador de fitxers de Windows a la barra d'eines",
+ "f8634147": "Afegeix a la secció Unitats",
+ "36613af3": "Elimina de la secció Unitats",
+ "bcb960f0": "Icones de Windows als menús",
+ "c2db7ff4": "Icones de l'Explorador de fitxers de Windows als menús contextuals, sense canviar la resta de l'aspecte",
+ "d4b35b70": "Icones en el color d'èmfasi",
+ "15cf593f": "Les icones de la barra d'eines en el color d'èmfasi de Windows, com a Files",
+ "a506af59": "i {n} més",
+ "96c3efbc": "Programes que l'utilitzen",
+ "1e4e844c": "Cap programa no l'utilitza",
+ "13d0dbab": "Cap programa no té aquests elements oberts ara mateix.",
+ "f40b1002": "Programes que utilitzen aquests elements",
+ "bf0c07d8": "Windows no ho pot determinar ara mateix.",
+ "8269ae1f": "Amaga la Paperera de reciclatge i Descàrregues",
+ "080ceea7": "No es mostren les icones de la Paperera de reciclatge i Descàrregues al final de l'illa central.",
+ "76c2c559": "Separador entre les aplicacions fixades i les que s'executen",
+ "b8cd47d5": "Hi ha una línia entre les aplicacions fixades i les aplicacions en execució que no estan fixades.",
+ "bb4229cb": "Aplicacions que no es mostren al Dock (per exemple chrome.exe, Spotify)"
 }

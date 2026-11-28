@@ -2233,5 +2233,22 @@
  "976b42f8": "Adicionar um separador",
  "4cc75906": "Ordem padrão",
  "4e935827": "Ícones do Windows",
- "a2e62d37": "Os ícones do Explorador de Arquivos do Windows na barra de ferramentas"
+ "a2e62d37": "Os ícones do Explorador de Arquivos do Windows na barra de ferramentas",
+ "f8634147": "Adicionar à seção Unidades",
+ "36613af3": "Remover da seção Unidades",
+ "bcb960f0": "Ícones do Windows nos menus",
+ "c2db7ff4": "Ícones do Explorador de Arquivos do Windows nos menus de clique com o botão direito, com o restante da aparência inalterado",
+ "d4b35b70": "Ícones na cor de destaque",
+ "15cf593f": "Os ícones da barra de ferramentas na cor de destaque do Windows, como no Files",
+ "a506af59": "e mais {n}",
+ "96c3efbc": "Programas que o estão usando",
+ "1e4e844c": "Nenhum programa está usando",
+ "13d0dbab": "Nenhum programa tem estes itens abertos agora.",
+ "f40b1002": "Programas que estão usando estes itens",
+ "bf0c07d8": "O Windows não conseguiu determinar isso agora.",
+ "8269ae1f": "Ocultar a Lixeira e Downloads",
+ "080ceea7": "Os ícones Lixeira e Downloads no final do bloco central não são exibidos.",
+ "76c2c559": "Divisor entre aplicativos fixados e em execução",
+ "b8cd47d5": "Uma linha separa os aplicativos fixados dos aplicativos em execução que não estão fixados.",
+ "bb4229cb": "Aplicativos que não aparecem no dock (por exemplo, chrome.exe, Spotify)"
 }

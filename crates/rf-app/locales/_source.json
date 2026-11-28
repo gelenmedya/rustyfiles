@@ -13478,5 +13478,107 @@
   "key": "Araç çubuğunda Windows Dosya Gezgini'nin simgeleri",
   "tr": "Araç çubuğunda Windows Dosya Gezgini'nin simgeleri",
   "en": "Windows File Explorer's icons on the toolbar"
+ },
+ {
+  "id": "f8634147",
+  "key": "Sürücüler bölümüne ekle",
+  "tr": "Sürücüler bölümüne ekle",
+  "en": "Add to the Drives section"
+ },
+ {
+  "id": "36613af3",
+  "key": "Sürücüler bölümünden kaldır",
+  "tr": "Sürücüler bölümünden kaldır",
+  "en": "Remove from the Drives section"
+ },
+ {
+  "id": "bcb960f0",
+  "key": "Menülerde Windows simgeleri",
+  "tr": "Menülerde Windows simgeleri",
+  "en": "Windows icons in menus"
+ },
+ {
+  "id": "c2db7ff4",
+  "key": "Sağ tık menülerinde Windows Dosya Gezgini'nin simgeleri, görünümün geri kalanı değişmeden",
+  "tr": "Sağ tık menülerinde Windows Dosya Gezgini'nin simgeleri, görünümün geri kalanı değişmeden",
+  "en": "Windows File Explorer's icons in the right-click menus, with the rest of the look unchanged"
+ },
+ {
+  "id": "d4b35b70",
+  "key": "Simgeler vurgu renginde",
+  "tr": "Simgeler vurgu renginde",
+  "en": "Icons in the accent colour"
+ },
+ {
+  "id": "15cf593f",
+  "key": "Araç çubuğunun simgeleri Windows'un vurgu renginde, Files'taki gibi",
+  "tr": "Araç çubuğunun simgeleri Windows'un vurgu renginde, Files'taki gibi",
+  "en": "The toolbar's icons in Windows' accent colour, as in Files"
+ },
+ {
+  "id": "a506af59",
+  "key": "ve {n} öğe daha",
+  "tr": "ve {n} öğe daha",
+  "en": "and {n} more"
+ },
+ {
+  "id": "96c3efbc",
+  "key": "Kullanan programlar",
+  "tr": "Kullanan programlar",
+  "en": "Programs using it"
+ },
+ {
+  "id": "1e4e844c",
+  "key": "Kullanan program yok",
+  "tr": "Kullanan program yok",
+  "en": "No program is using it"
+ },
+ {
+  "id": "13d0dbab",
+  "key": "Bu öğeleri şu anda açık tutan bir program yok.",
+  "tr": "Bu öğeleri şu anda açık tutan bir program yok.",
+  "en": "No program has these items open right now."
+ },
+ {
+  "id": "f40b1002",
+  "key": "Bu öğeleri kullanan programlar",
+  "tr": "Bu öğeleri kullanan programlar",
+  "en": "Programs using these items"
+ },
+ {
+  "id": "bf0c07d8",
+  "key": "Windows bunu şu anda söyleyemedi.",
+  "tr": "Windows bunu şu anda söyleyemedi.",
+  "en": "Windows could not tell this right now."
+ },
+ {
+  "id": "8269ae1f",
+  "key": "Geri Dönüşüm Kutusu ve İndirilenler'i gizle",
+  "tr": "Geri Dönüşüm Kutusu ve İndirilenler'i gizle",
+  "en": "Hide the Recycle Bin and Downloads"
+ },
+ {
+  "id": "080ceea7",
+  "key": "Orta adanın sonundaki Geri Dönüşüm Kutusu ve İndirilenler simgeleri gösterilmez.",
+  "tr": "Orta adanın sonundaki Geri Dönüşüm Kutusu ve İndirilenler simgeleri gösterilmez.",
+  "en": "The Recycle Bin and Downloads icons at the end of the middle island are not shown."
+ },
+ {
+  "id": "76c2c559",
+  "key": "Sabitlenenlerle çalışanlar arasında ayırıcı",
+  "tr": "Sabitlenenlerle çalışanlar arasında ayırıcı",
+  "en": "Divider between pinned and running apps"
+ },
+ {
+  "id": "b8cd47d5",
+  "key": "Sabitlenmiş uygulamalarla sabitlenmemiş çalışan uygulamalar arasına bir çizgi konur.",
+  "tr": "Sabitlenmiş uygulamalarla sabitlenmemiş çalışan uygulamalar arasına bir çizgi konur.",
+  "en": "A line goes between the pinned apps and the running apps that are not pinned."
+ },
+ {
+  "id": "bb4229cb",
+  "key": "Dock'ta gösterilmeyecek uygulamalar (örneğin chrome.exe, Spotify)",
+  "tr": "Dock'ta gösterilmeyecek uygulamalar (örneğin chrome.exe, Spotify)",
+  "en": "Apps not shown in the dock (for example chrome.exe, Spotify)"
  }
 ]

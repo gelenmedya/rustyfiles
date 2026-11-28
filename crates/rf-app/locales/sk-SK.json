@@ -2233,5 +2233,22 @@
  "976b42f8": "Pridať oddeľovač",
  "4cc75906": "Predvolené poradie",
  "4e935827": "Ikony Windows",
- "a2e62d37": "Ikony Prieskumníka súborov Windows na paneli nástrojov"
+ "a2e62d37": "Ikony Prieskumníka súborov Windows na paneli nástrojov",
+ "f8634147": "Pridať do sekcie Jednotky",
+ "36613af3": "Odstrániť zo sekcie Jednotky",
+ "bcb960f0": "Ikony Windows v ponukách",
+ "c2db7ff4": "Ikony Prieskumníka Windows v kontextových ponukách, ostatný vzhľad zostáva nezmenený",
+ "d4b35b70": "Ikony vo farbe zvýraznenia",
+ "15cf593f": "Ikony panela nástrojov vo farbe zvýraznenia Windows, ako v aplikácii Files",
+ "a506af59": "a ešte {n}",
+ "96c3efbc": "Programy, ktoré ho používajú",
+ "1e4e844c": "Žiadny program ho nepoužíva",
+ "13d0dbab": "Žiadny program momentálne nemá otvorené tieto položky.",
+ "f40b1002": "Programy, ktoré používajú tieto položky",
+ "bf0c07d8": "Windows momentálne nedokáže zistiť.",
+ "8269ae1f": "Skryť Kôš a Stiahnuté",
+ "080ceea7": "Ikony Koša a Stiahnutých na konci stredného ostrova sa nezobrazujú.",
+ "76c2c559": "Oddeľovač medzi pripnutými a spustenými aplikáciami",
+ "b8cd47d5": "Medzi pripnuté aplikácie a spustené aplikácie, ktoré nie sú pripnuté, sa vkladá čiara.",
+ "bb4229cb": "Aplikácie, ktoré sa nezobrazujú v Docku (napríklad chrome.exe, Spotify)"
 }

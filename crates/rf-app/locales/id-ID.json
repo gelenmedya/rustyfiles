@@ -2233,5 +2233,22 @@
  "976b42f8": "Tambahkan pemisah",
  "4cc75906": "Urutan bawaan",
  "4e935827": "Ikon Windows",
- "a2e62d37": "Ikon File Explorer Windows di bilah alat"
+ "a2e62d37": "Ikon File Explorer Windows di bilah alat",
+ "f8634147": "Tambahkan ke bagian Drive",
+ "36613af3": "Hapus dari bagian Drive",
+ "bcb960f0": "Ikon Windows di menu",
+ "c2db7ff4": "Ikon File Explorer Windows di menu klik kanan, tampilan lainnya tidak berubah",
+ "d4b35b70": "Ikon dalam warna aksen",
+ "15cf593f": "Ikon bilah alat dalam warna aksen Windows, seperti di Files",
+ "a506af59": "dan {n} lainnya",
+ "96c3efbc": "Program yang menggunakannya",
+ "1e4e844c": "Tidak ada program yang menggunakannya",
+ "13d0dbab": "Saat ini tidak ada program yang membuka item ini.",
+ "f40b1002": "Program yang menggunakan item ini",
+ "bf0c07d8": "Windows belum dapat memberi tahu hal ini saat ini.",
+ "8269ae1f": "Sembunyikan Tempat Sampah dan Unduhan",
+ "080ceea7": "Ikon Tempat Sampah dan Unduhan di ujung pulau tengah tidak ditampilkan.",
+ "76c2c559": "Pemisah antara aplikasi tersemat dan aplikasi yang berjalan",
+ "b8cd47d5": "Sebuah garis memisahkan aplikasi tersemat dari aplikasi yang sedang berjalan tetapi tidak disematkan.",
+ "bb4229cb": "Aplikasi yang tidak ditampilkan di dock (misalnya chrome.exe, Spotify)"
 }

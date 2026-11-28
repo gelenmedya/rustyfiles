@@ -2233,5 +2233,22 @@
  "976b42f8": "Legg til en skillelinje",
  "4cc75906": "Standard rekkefølge",
  "4e935827": "Windows-ikoner",
- "a2e62d37": "Ikonene fra Windows Filutforsker på verktøylinjen"
+ "a2e62d37": "Ikonene fra Windows Filutforsker på verktøylinjen",
+ "f8634147": "Legg til i Enheter-delen",
+ "36613af3": "Fjern fra Enheter-delen",
+ "bcb960f0": "Windows-ikoner i menyer",
+ "c2db7ff4": "Ikonene fra Windows Utforsker i hurtigmenyene, med resten av utseendet uendret",
+ "d4b35b70": "Ikoner i aksentfargen",
+ "15cf593f": "Verktøylinjens ikoner i Windows' aksentfarge, slik som i Files",
+ "a506af59": "og {n} til",
+ "96c3efbc": "Programmer som bruker den",
+ "1e4e844c": "Ingen program bruker den",
+ "13d0dbab": "Ingen program har disse elementene åpne akkurat nå.",
+ "f40b1002": "Programmer som bruker disse elementene",
+ "bf0c07d8": "Windows kunne ikke fastslå dette akkurat nå.",
+ "8269ae1f": "Skjul Papirkurv og Nedlastinger",
+ "080ceea7": "Ikonene for Papirkurv og Nedlastinger på slutten av den midtre øya vises ikke.",
+ "76c2c559": "Skille mellom festede og kjørende apper",
+ "b8cd47d5": "En linje går mellom de festede appene og de kjørende appene som ikke er festet.",
+ "bb4229cb": "Apper som ikke vises i docken (for eksempel chrome.exe, Spotify)"
 }

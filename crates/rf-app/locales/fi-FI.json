@@ -2233,5 +2233,22 @@
  "976b42f8": "Lisää erotin",
  "4cc75906": "Oletusjärjestys",
  "4e935827": "Windowsin kuvakkeet",
- "a2e62d37": "Windowsin Resurssienhallinnan kuvakkeet työkalurivillä"
+ "a2e62d37": "Windowsin Resurssienhallinnan kuvakkeet työkalurivillä",
+ "f8634147": "Lisää Asemat-osioon",
+ "36613af3": "Poista Asemat-osiosta",
+ "bcb960f0": "Windowsin kuvakkeet valikoissa",
+ "c2db7ff4": "Windowsin Resurssienhallinnan kuvakkeet pikavalikoissa, muu ulkoasu ennallaan",
+ "d4b35b70": "Kuvakkeet korostusvärillä",
+ "15cf593f": "Työkalupalkin kuvakkeet Windowsin korostusvärillä, kuten Files-sovelluksessa",
+ "a506af59": "ja {n} muuta",
+ "96c3efbc": "Tätä käyttävät ohjelmat",
+ "1e4e844c": "Mikään ohjelma ei käytä sitä",
+ "13d0dbab": "Mikään ohjelma ei ole parhaillaan avannut näitä kohteita.",
+ "f40b1002": "Näitä kohteita käyttävät ohjelmat",
+ "bf0c07d8": "Windows ei voinut selvittää tätä juuri nyt.",
+ "8269ae1f": "Piilota Roskakori ja Lataukset",
+ "080ceea7": "Keskisaarekkeen lopussa olevia Roskakorin ja Latausten kuvakkeita ei näytetä.",
+ "76c2c559": "Erotin kiinnitettyjen ja käynnissä olevien sovellusten välillä",
+ "b8cd47d5": "Kiinnitettyjen sovellusten ja käynnissä olevien, ei kiinnitettyjen sovellusten väliin tulee viiva.",
+ "bb4229cb": "Telakassa näkymättömät sovellukset (esimerkiksi chrome.exe, Spotify)"
 }

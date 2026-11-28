@@ -2233,5 +2233,22 @@
  "976b42f8": "Trennlinie hinzufügen",
  "4cc75906": "Standardreihenfolge",
  "4e935827": "Windows-Symbole",
- "a2e62d37": "Die Symbole des Windows-Explorers in der Symbolleiste"
+ "a2e62d37": "Die Symbole des Windows-Explorers in der Symbolleiste",
+ "f8634147": "Zum Bereich Laufwerke hinzufügen",
+ "36613af3": "Aus dem Bereich Laufwerke entfernen",
+ "bcb960f0": "Windows-Symbole in Menüs",
+ "c2db7ff4": "Die Symbole des Windows-Explorers in den Kontextmenüs, der übrige Look bleibt unverändert",
+ "d4b35b70": "Symbole in Akzentfarbe",
+ "15cf593f": "Die Symbole der Werkzeugleiste in der Windows-Akzentfarbe, wie in Files",
+ "a506af59": "und {n} weitere",
+ "96c3efbc": "Programme, die es verwenden",
+ "1e4e844c": "Kein Programm verwendet es",
+ "13d0dbab": "Im Moment haben keine Programme diese Elemente geöffnet.",
+ "f40b1002": "Programme, die diese Elemente verwenden",
+ "bf0c07d8": "Windows kann dies im Moment nicht ermitteln.",
+ "8269ae1f": "Papierkorb und Downloads ausblenden",
+ "080ceea7": "Die Symbole für Papierkorb und Downloads am Ende der mittleren Insel werden nicht angezeigt.",
+ "76c2c559": "Trennlinie zwischen angehefteten und laufenden Apps",
+ "b8cd47d5": "Zwischen den angehefteten Apps und den laufenden Apps, die nicht angeheftet sind, wird eine Linie angezeigt.",
+ "bb4229cb": "Im Dock nicht angezeigte Apps (zum Beispiel chrome.exe, Spotify)"
 }

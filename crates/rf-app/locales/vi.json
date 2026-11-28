@@ -2233,5 +2233,22 @@
  "976b42f8": "Thêm dấu phân cách",
  "4cc75906": "Thứ tự mặc định",
  "4e935827": "Biểu tượng Windows",
- "a2e62d37": "Biểu tượng của File Explorer trong Windows trên thanh công cụ"
+ "a2e62d37": "Biểu tượng của File Explorer trong Windows trên thanh công cụ",
+ "f8634147": "Thêm vào mục Ổ đĩa",
+ "36613af3": "Xóa khỏi mục Ổ đĩa",
+ "bcb960f0": "Biểu tượng Windows trong menu",
+ "c2db7ff4": "Biểu tượng của File Explorer trong menu chuột phải, phần giao diện còn lại không thay đổi",
+ "d4b35b70": "Biểu tượng theo màu nhấn",
+ "15cf593f": "Biểu tượng trên thanh công cụ theo màu nhấn của Windows, như trong Files",
+ "a506af59": "và {n} mục khác",
+ "96c3efbc": "Chương trình đang dùng",
+ "1e4e844c": "Không có chương trình nào đang dùng",
+ "13d0dbab": "Hiện không có chương trình nào đang mở các mục này.",
+ "f40b1002": "Chương trình đang dùng các mục này",
+ "bf0c07d8": "Hiện Windows không thể xác định.",
+ "8269ae1f": "Ẩn Thùng rác và Tải xuống",
+ "080ceea7": "Các biểu tượng Thùng rác và Tải xuống ở cuối dải giữa sẽ không được hiển thị.",
+ "76c2c559": "Đường phân cách giữa ứng dụng đã ghim và ứng dụng đang chạy",
+ "b8cd47d5": "Một đường kẻ được đặt giữa các ứng dụng đã ghim và các ứng dụng đang chạy nhưng chưa ghim.",
+ "bb4229cb": "Ứng dụng không hiển thị trong dock (ví dụ chrome.exe, Spotify)"
 }

@@ -2233,5 +2233,22 @@
  "976b42f8": "Elválasztó hozzáadása",
  "4cc75906": "Alapértelmezett sorrend",
  "4e935827": "Windows-ikonok",
- "a2e62d37": "A Windows Fájlkezelő ikonjai az eszköztáron"
+ "a2e62d37": "A Windows Fájlkezelő ikonjai az eszköztáron",
+ "f8634147": "Hozzáadás a Meghajtók szakaszhoz",
+ "36613af3": "Eltávolítás a Meghajtók szakaszból",
+ "bcb960f0": "Windows-ikonok a menükben",
+ "c2db7ff4": "A Windows Fájlkezelő ikonjai a helyi menükben, a megjelenés többi részének változatlan hagyásával",
+ "d4b35b70": "Ikonok a kiemelőszínben",
+ "15cf593f": "Az eszköztár ikonjai a Windows kiemelőszínében, a Files-hoz hasonlóan",
+ "a506af59": "és még {n}",
+ "96c3efbc": "Ezt használó programok",
+ "1e4e844c": "Egyetlen program sem használja",
+ "13d0dbab": "Jelenleg egyetlen program sincs megnyitva ezekkel az elemekkel.",
+ "f40b1002": "Ezeket az elemeket használó programok",
+ "bf0c07d8": "A Windows jelenleg nem tudja megállapítani.",
+ "8269ae1f": "A Lomtár és a Letöltések elrejtése",
+ "080ceea7": "A közepes sziget végén lévő Lomtár és Letöltések ikonok nem jelennek meg.",
+ "76c2c559": "Elválasztó a rögzített és a futó alkalmazások között",
+ "b8cd47d5": "Vonal jelenik meg a rögzített alkalmazások és a nem rögzített futó alkalmazások közé.",
+ "bb4229cb": "A dokkban nem megjelenő alkalmazások (például chrome.exe, Spotify)"
 }

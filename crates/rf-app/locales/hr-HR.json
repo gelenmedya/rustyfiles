@@ -2233,5 +2233,22 @@
  "976b42f8": "Dodaj razdjelnik",
  "4cc75906": "Zadani redoslijed",
  "4e935827": "Ikone sustava Windows",
- "a2e62d37": "Ikone Eksplorera za datoteke sustava Windows na alatnoj traci"
+ "a2e62d37": "Ikone Eksplorera za datoteke sustava Windows na alatnoj traci",
+ "f8634147": "Dodaj u odjeljak Pogoni",
+ "36613af3": "Ukloni iz odjeljka Pogoni",
+ "bcb960f0": "Windows ikone u izbornicima",
+ "c2db7ff4": "Ikone Windows File Explorera u izbornicima desnog klika, ostatak izgleda ostaje nepromijenjen",
+ "d4b35b70": "Ikone u naglasnoj boji",
+ "15cf593f": "Ikone alatne trake u Windows naglasnoj boji, kao u Filesu",
+ "a506af59": "i još {n}",
+ "96c3efbc": "Programi koji ga koriste",
+ "1e4e844c": "Nijedan program ga ne koristi",
+ "13d0dbab": "Nijedan program trenutačno nema otvorene ove stavke.",
+ "f40b1002": "Programi koji koriste ove stavke",
+ "bf0c07d8": "Windows to trenutačno ne može utvrditi.",
+ "8269ae1f": "Sakrij Koš za otpatke i Preuzimanja",
+ "080ceea7": "Ikone Koša za otpatke i Preuzimanja na kraju srednjeg otoka nisu prikazane.",
+ "76c2c559": "Razdjelnik između prikvačenih i pokrenutih aplikacija",
+ "b8cd47d5": "Crta se prikazuje između prikvačenih aplikacija i pokrenutih aplikacija koje nisu prikvačene.",
+ "bb4229cb": "Aplikacije koje se ne prikazuju u docku (na primjer chrome.exe, Spotify)"
 }

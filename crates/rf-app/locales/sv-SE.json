@@ -2233,5 +2233,22 @@
  "976b42f8": "Lägg till en avgränsare",
  "4cc75906": "Standardordning",
  "4e935827": "Windows-ikoner",
- "a2e62d37": "Ikonerna från Windows Utforskaren i verktygsfältet"
+ "a2e62d37": "Ikonerna från Windows Utforskaren i verktygsfältet",
+ "f8634147": "Lägg till i avsnittet Enheter",
+ "36613af3": "Ta bort från avsnittet Enheter",
+ "bcb960f0": "Windows-ikoner i menyer",
+ "c2db7ff4": "Utforskarens ikoner i snabbmenyerna, med resten av utseendet oförändrat",
+ "d4b35b70": "Ikoner i accentfärg",
+ "15cf593f": "Verktygsfältets ikoner i Windows accentfärg, som i Files",
+ "a506af59": "och {n} till",
+ "96c3efbc": "Program som använder den",
+ "1e4e844c": "Inget program använder den",
+ "13d0dbab": "Inga program har dessa objekt öppna just nu.",
+ "f40b1002": "Program som använder dessa objekt",
+ "bf0c07d8": "Windows kunde inte avgöra detta just nu.",
+ "8269ae1f": "Dölj Papperskorgen och Hämtade filer",
+ "080ceea7": "Ikonerna för Papperskorgen och Hämtade filer i slutet av mittendelen visas inte.",
+ "76c2c559": "Avdelare mellan fästa och körande appar",
+ "b8cd47d5": "En linje visas mellan de fästa apparna och de körande apparna som inte är fästa.",
+ "bb4229cb": "Appar som inte visas i Dock (till exempel chrome.exe, Spotify)"
 }

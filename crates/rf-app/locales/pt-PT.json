@@ -2233,5 +2233,22 @@
  "976b42f8": "Adicionar um separador",
  "4cc75906": "Ordem predefinida",
  "4e935827": "Ícones do Windows",
- "a2e62d37": "Os ícones do Explorador de Ficheiros do Windows na barra de ferramentas"
+ "a2e62d37": "Os ícones do Explorador de Ficheiros do Windows na barra de ferramentas",
+ "f8634147": "Adicionar à secção Unidades",
+ "36613af3": "Remover da secção Unidades",
+ "bcb960f0": "Ícones do Windows nos menus",
+ "c2db7ff4": "Ícones do Explorador de Ficheiros do Windows nos menus de contexto, mantendo inalterado o resto do aspeto",
+ "d4b35b70": "Ícones na cor de destaque",
+ "15cf593f": "Os ícones da barra de ferramentas na cor de destaque do Windows, como no Files",
+ "a506af59": "e mais {n}",
+ "96c3efbc": "Programas que o utilizam",
+ "1e4e844c": "Nenhum programa o está a utilizar",
+ "13d0dbab": "Nenhum programa tem estes itens abertos neste momento.",
+ "f40b1002": "Programas que utilizam estes itens",
+ "bf0c07d8": "O Windows não consegue indicar isto neste momento.",
+ "8269ae1f": "Ocultar a Reciclagem e as Transferências",
+ "080ceea7": "Os ícones da Reciclagem e das Transferências no fim da ilha central não são apresentados.",
+ "76c2c559": "Separador entre as aplicações afixadas e as em execução",
+ "b8cd47d5": "Uma linha separa as aplicações afixadas das aplicações em execução que não estão afixadas.",
+ "bb4229cb": "Aplicações que não são apresentadas na doca (por exemplo, chrome.exe, Spotify)"
 }

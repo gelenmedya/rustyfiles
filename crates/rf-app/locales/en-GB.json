@@ -2233,5 +2233,22 @@
  "976b42f8": "Add a separator",
  "4cc75906": "Default order",
  "4e935827": "Windows icons",
- "a2e62d37": "Windows File Explorer's icons on the toolbar"
+ "a2e62d37": "Windows File Explorer's icons on the toolbar",
+ "f8634147": "Add to the Drives section",
+ "36613af3": "Remove from the Drives section",
+ "bcb960f0": "Windows icons in menus",
+ "c2db7ff4": "Windows File Explorer's icons in the right-click menus, with the rest of the look unchanged",
+ "d4b35b70": "Icons in the accent colour",
+ "15cf593f": "The toolbar's icons in Windows' accent colour, as in Files",
+ "a506af59": "and {n} more",
+ "96c3efbc": "Programs using it",
+ "1e4e844c": "No program is using it",
+ "13d0dbab": "No program has these items open right now.",
+ "f40b1002": "Programs using these items",
+ "bf0c07d8": "Windows could not tell this right now.",
+ "8269ae1f": "Hide the Recycle Bin and Downloads",
+ "080ceea7": "The Recycle Bin and Downloads icons at the end of the middle island are not shown.",
+ "76c2c559": "Divider between pinned and running apps",
+ "b8cd47d5": "A line goes between the pinned apps and the running apps that are not pinned.",
+ "bb4229cb": "Apps not shown in the dock (for example chrome.exe, Spotify)"
 }
