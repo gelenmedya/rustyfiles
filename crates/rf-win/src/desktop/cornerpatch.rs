@@ -5,6 +5,10 @@
 //! line of wallpaper under each black bottom corner. The cover window cannot grow: reaching every edge of the monitor is what makes
 //! a window a full-screen program to the shell and to other programs.
 //!
+//! WITH NO SHELL DESKTOP (`rf_core::desktop::cover::bare`) nothing of Explorer's is under the cover: the row shows Windows' bare
+//! background, a dark grey line along the whole bottom edge whatever the wallpaper is (seen on an OLED monitor with a black desktop).
+//! The patch is then one window as wide as the monitor, the whole row (`corners::bottom_rows`).
+//!
 //! WHAT A PATCH IS: a black pop-up one pixel row high and a few pixels wide, OWNED by its cover window. Windows keeps an owned window
 //! above its owner wherever the owner goes in the z-order, hides it when the owner is minimized and destroys it with the owner, so a
 //! patch needs no z-order rule and no clean-up of its own. It is transparent to the mouse (a press goes to what is under it), is

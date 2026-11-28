@@ -42,9 +42,29 @@ pub fn bottom_patches(monitor: Rect, radius: i32, rows: i32) -> Vec<Rect> {
     out
 }
 
+/// The whole of the `rows` bottom pixel rows `monitor`'s cover window leaves out, as one black rectangle: for when there is no
+/// Explorer's desktop under the cover. The rows then show Windows' bare background (dark grey, whatever the wallpaper), a visible
+/// line along the bottom edge. Nothing for a monitor with no row to spare (its cover is the whole monitor: `cover::geometry`).
+pub fn bottom_rows(monitor: Rect, rows: i32) -> Vec<Rect> {
+    if rows <= 0 || monitor.width() <= 0 || monitor.height() <= rows {
+        return Vec::new();
+    }
+    vec![Rect::new(monitor.left, monitor.bottom - rows, monitor.right, monitor.bottom)]
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn with_no_desktop_under_it_the_whole_left_out_row_is_patched() {
+        assert_eq!(bottom_rows(Rect::new(0, 0, 3840, 2160), 1), [Rect::new(0, 2159, 3840, 2160)]);
+        // a portrait monitor left of the primary one, its top above it (negative origin)
+        assert_eq!(bottom_rows(Rect::new(-2160, -879, 0, 2961), 1), [Rect::new(-2160, 2960, 0, 2961)]);
+        assert!(bottom_rows(Rect::new(0, 0, 100, 1), 1).is_empty(), "no row to spare: the cover is the whole monitor");
+        assert!(bottom_rows(Rect::default(), 1).is_empty());
+        assert!(bottom_rows(Rect::new(0, 0, 100, 100), 0).is_empty(), "no row left out, nothing to patch");
+    }
 
     #[test]
     fn the_bottom_row_of_a_corner_is_black_for_most_of_the_radius() {
