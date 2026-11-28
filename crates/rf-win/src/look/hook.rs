@@ -37,6 +37,14 @@ fn is_own(h: isize) -> bool {
     h != 0 && OWN_WINDOWS.read().unwrap_or_else(|e| e.into_inner()).contains(&h)
 }
 
+/// The preview was clicked (any of its windows); taken by the hook thread at the next Space release (issue 404).
+static POINTER_USED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Called by the preview on a mouse press inside it: a Space held at that moment does not close the preview when it is let go.
+pub fn pointer_in_preview() {
+    POINTER_USED.store(true, std::sync::atomic::Ordering::Relaxed);
+}
+
 struct HookState {
     gate: KeyGate,
     tx: Sender<LookEvent>,
@@ -66,6 +74,14 @@ fn handle_key(st: &mut HookState, msg: u32, info: &KBDLLHOOKSTRUCT) {
         (TargetKind::None, 0, false)
     };
     let mods = LookKey::from_vk(vk).is_some() && modifiers_down(info);
+    if vk == super::keys::VK_SPACE {
+        if down && !st.gate.space_held() {
+            // a fresh press: a click before it does not count for it (the repeats of a held key leave it alone)
+            POINTER_USED.store(false, std::sync::atomic::Ordering::Relaxed);
+        } else if !down && POINTER_USED.swap(false, std::sync::atomic::Ordering::Relaxed) {
+            st.gate.pointer_used();
+        }
+    }
     if let Some(action) = st.gate.on_key(vk, down, mods, info.time as u64, ok) {
         let _ = st.tx.send(LookEvent { action, target, hwnd });
     }

@@ -645,6 +645,8 @@ impl Render for LookWindow {
         let more = self.more_open.then(|| self.render_more(&p, cx).into_any_element());
         div()
             .id("look-root")
+            // a press in the preview while Space is held: letting Space go does not close it (issue 404)
+            .capture_any_mouse_down(|_, _, _| rf_win::look::hook::pointer_in_preview())
             .relative()
             .size_full()
             .track_focus(&self.focus)

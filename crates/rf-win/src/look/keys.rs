@@ -45,6 +45,9 @@ pub struct KeyGate {
     last_invalid: Option<u64>,
     /// Boşluk basılıysa basıldığı an.
     space_down: Option<u64>,
+    /// Boşluk basılıyken önizlemenin içine tıklandı: kullanıcı önizlemeyi kullanıyor, bırakış onu kapatmaz (issue 404: Boşluğu
+    /// tutarken ses ya da ilerleme çubuğu sürüklendi, Boşluk bırakılınca pencere gitti).
+    used: bool,
 }
 
 impl KeyGate {
@@ -52,6 +55,16 @@ impl KeyGate {
 
     /// Ön plandaki pencere değişti: yazma koruması biter.
     pub fn foreground_changed(&mut self) { self.last_invalid = None; }
+
+    /// Boşluk basılı mı (tekrar eden basışları yenisinden ayırmak için).
+    pub fn space_held(&self) -> bool { self.space_down.is_some() }
+
+    /// Önizlemenin içine tıklandı: Boşluk o sırada basılıysa bırakışı pencereyi kapatmaz (issue 404).
+    pub fn pointer_used(&mut self) {
+        if self.space_down.is_some() {
+            self.used = true;
+        }
+    }
 
     pub fn on_key(&mut self, vk: u32, down: bool, modifiers: bool, now_ms: u64, target_ok: bool) -> Option<LookAction> {
         let Some(key) = LookKey::from_vk(vk) else {
@@ -61,6 +74,7 @@ impl KeyGate {
         // Boşluk bırakılınca durum her koşulda temizlenir (koruma süresi içinde bile), yoksa sonraki
         // basış otomatik tekrar sanılır ve bırakışı bayat bir süreyle eylem üretir.
         let released_at = if key == LookKey::Space && !down { self.space_down.take() } else { None };
+        let used = if key == LookKey::Space && !down { std::mem::take(&mut self.used) } else { false };
         if let Some(t) = self.last_invalid {
             if now_ms.saturating_sub(t) < GUARD_MS { return None; }
             self.last_invalid = None;
@@ -72,13 +86,14 @@ impl KeyGate {
             (LookKey::Space, true) => {
                 if self.space_down.is_some() { return None; } // otomatik tekrar
                 self.space_down = Some(now_ms);
+                self.used = false;
                 Some(LookAction::Toggle)
             }
             (LookKey::Space, false) => {
                 // basılı tutup bırakma yalnız kapatır (açık pencereyi kapatmak için basılıp tutulduysa
                 // bırakış onu yeniden açmamalı)
                 let held = released_at?;
-                (now_ms.saturating_sub(held) >= HOLD_CLOSE_MS).then_some(LookAction::Close)
+                (!used && now_ms.saturating_sub(held) >= HOLD_CLOSE_MS).then_some(LookAction::Close)
             }
             (LookKey::Enter, true) => Some(LookAction::RunAndClose),
             (LookKey::Escape, false) => Some(LookAction::Close),
@@ -105,6 +120,17 @@ mod tests {
         // sonraki basış otomatik tekrar sanılmamalı, bırakışı sahte bir eylem üretmemeli
         assert_eq!(g.on_key(VK_SPACE, true, false, 3000, true), Some(LookAction::Toggle));
         assert_eq!(g.on_key(VK_SPACE, false, false, 3100, true), None);
+    }
+    /// Issue 404: Boşluk basılıyken önizlemenin denetimleri kullanıldıysa bırakış pencereyi kapatmaz; sonraki basılı tutuş yine kapatır.
+    #[test] fn using_the_preview_while_holding_space_keeps_it_open() {
+        let mut g = KeyGate::new();
+        assert_eq!(g.on_key(VK_SPACE, true, false, 0, true), Some(LookAction::Toggle));
+        g.pointer_used();
+        assert_eq!(g.on_key(VK_SPACE, true, false, 400, true), None, "auto-repeat");
+        assert_eq!(g.on_key(VK_SPACE, false, false, 2000, true), None, "the preview stays");
+        g.pointer_used(); // (a click with Space up changes nothing)
+        assert_eq!(g.on_key(VK_SPACE, true, false, 3000, true), Some(LookAction::Toggle));
+        assert_eq!(g.on_key(VK_SPACE, false, false, 3900, true), Some(LookAction::Close));
     }
     #[test] fn typing_guard() { let mut g = KeyGate::new(); assert_eq!(g.on_key(0x41 /*A*/, true, false, 0, true), None); assert_eq!(g.on_key(VK_SPACE, true, false, 500, true), None); assert_eq!(g.on_key(VK_SPACE, true, false, 1600, true), Some(LookAction::Toggle)); }
     #[test] fn foreground_change_clears_guard() { let mut g = KeyGate::new(); g.on_key(0x41, true, false, 0, true); g.foreground_changed(); assert_eq!(g.on_key(VK_SPACE, true, false, 10, true), Some(LookAction::Toggle)); }
