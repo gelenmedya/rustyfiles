@@ -120,6 +120,10 @@ fn hover_media_pending() -> &'static parking_lot::Mutex<HashSet<PathBuf>> {
 /// The width of the card's column of labels ("Type", "Date modified" ...): one width, so that the values stand in a line.
 const TIP_LABEL_W: f32 = 96.;
 
+/// How many items PageUp / PageDown move: Shift+PageUp / Shift+PageDown extend the selection by the same page, so that the two
+/// agree on what a page is.
+const PAGE_STEP: isize = 20;
+
 /// The card an item shows when the pointer rests on it: its name with a dot in its kind's colour, then its details as a table
 /// with the labels dimmed, so that the eye finds the value it is after, and its Git state spelled out.
 ///
@@ -669,6 +673,25 @@ mod folder_tooltip_size_tests {
         assert_eq!(known.measured_text(false), Some(format::size(1000)));
         assert_eq!(known.measured_text(true), Some(format::size(4096)));
     }
+}
+
+/// The visible indices an extending move selects, anchor to the item it stopped on (either way round).
+fn extend_range(anchor: usize, to: usize) -> std::ops::RangeInclusive<usize> {
+    if anchor <= to {
+        anchor..=to
+    } else {
+        to..=anchor
+    }
+}
+
+/// Selects `visible[from..=to]` (either way round) in place of everything else, and gives back the index the keyboard is left on.
+fn select_between(selected: &mut HashSet<u32>, visible: &[u32], from: usize, to: usize) -> usize {
+    selected.clear();
+    let last = visible.len().saturating_sub(1);
+    for vi in extend_range(from, to).take_while(|&vi| vi < visible.len()) {
+        selected.insert(visible[vi]);
+    }
+    to.min(last)
 }
 
 pub struct FolderView {
@@ -3004,12 +3027,7 @@ impl FolderView {
     }
 
     fn select_range(&mut self, from: usize, to: usize) {
-        self.selected.clear();
-        let (a, b) = if from <= to { (from, to) } else { (to, from) };
-        for vi in a..=b.min(self.visible.len().saturating_sub(1)) {
-            self.selected.insert(self.visible[vi]);
-        }
-        self.cursor = Some(to);
+        self.cursor = Some(select_between(&mut self.selected, &self.visible, from, to));
     }
 
     /// The keyboard came to the list with Tab (issue 38): the item it is on (else the first selected) is brought into view; with
@@ -3037,6 +3055,12 @@ impl FolderView {
         self.move_cursor(if forward { 1 } else { -1 }, false, cx);
     }
 
+    /// Where an extending move starts from (`Home`, `End`, or a Shift step): the item the keyboard is on, else the last one the
+    /// anchor held (the selection was cleared with Escape), else the first item for a move down or the last for a move up.
+    fn extend_anchor(&self, delta: isize, last: usize) -> usize {
+        self.anchor.or(self.cursor).unwrap_or(if delta >= 0 { 0 } else { last })
+    }
+
     fn move_cursor(&mut self, delta: isize, extend: bool, cx: &mut Context<Self>) {
         if self.visible.is_empty() {
             return;
@@ -3055,7 +3079,7 @@ impl FolderView {
             Some(c) => (c as isize + delta).clamp(0, last),
         } as usize;
         if extend {
-            let anchor = self.anchor.unwrap_or(next);
+            let anchor = self.extend_anchor(delta, last as usize);
             self.anchor = Some(anchor);
             self.select_range(anchor, next);
         } else {
@@ -7011,10 +7035,14 @@ impl Render for FolderView {
                 }
                 ViewMode::Details => {}
             }))
-            .on_action(cx.listener(|this, _: &PageDown, _, cx| this.move_cursor(20, false, cx)))
-            .on_action(cx.listener(|this, _: &PageUp, _, cx| this.move_cursor(-20, false, cx)))
+            .on_action(cx.listener(|this, _: &PageDown, _, cx| this.move_cursor(PAGE_STEP, false, cx)))
+            .on_action(cx.listener(|this, _: &PageUp, _, cx| this.move_cursor(-PAGE_STEP, false, cx)))
+            .on_action(cx.listener(|this, _: &ExtendPageDown, _, cx| this.move_cursor(PAGE_STEP, true, cx)))
+            .on_action(cx.listener(|this, _: &ExtendPageUp, _, cx| this.move_cursor(-PAGE_STEP, true, cx)))
             .on_action(cx.listener(|this, _: &SelectFirst, _, cx| this.move_cursor(isize::MIN / 2, false, cx)))
             .on_action(cx.listener(|this, _: &SelectLast, _, cx| this.move_cursor(isize::MAX / 2, false, cx)))
+            .on_action(cx.listener(|this, _: &ExtendFirst, _, cx| this.move_cursor(isize::MIN / 2, true, cx)))
+            .on_action(cx.listener(|this, _: &ExtendLast, _, cx| this.move_cursor(isize::MAX / 2, true, cx)))
             .on_action(cx.listener(|this, _: &SelectAll, _, cx| {
                 this.selected = this.visible.iter().copied().collect();
                 cx.notify();
@@ -7303,6 +7331,58 @@ mod row_press_tests {
         }
         // (a tile has empty space around it: a press on the tile always takes the item)
         assert_eq!(row_press_band(ViewMode::Grid, false, false, true, true), None);
+    }
+}
+
+#[cfg(test)]
+mod extend_selection_tests {
+    use std::collections::HashSet;
+
+    use super::{extend_range, select_between};
+
+    fn selected(from: usize, to: usize, n: u32) -> (Vec<u32>, usize) {
+        let visible: Vec<u32> = (0..n).collect();
+        let mut sel = HashSet::new();
+        let cursor = select_between(&mut sel, &visible, from, to);
+        let mut out: Vec<u32> = sel.into_iter().collect();
+        out.sort_unstable();
+        (out, cursor)
+    }
+
+    #[test]
+    fn shift_home_and_shift_end_take_the_anchor_to_the_start_or_the_end() {
+        assert_eq!(selected(5, 0, 20), ((0..=5).collect(), 0), "the selection runs up to the current item, which keeps the keyboard");
+        assert_eq!(selected(5, 19, 20), ((5..20).collect(), 19));
+        assert_eq!(selected(0, 19, 20), ((0..20).collect(), 19), "everything, from the first item");
+    }
+
+    #[test]
+    fn an_extending_move_with_nothing_selected_takes_the_whole_list_or_only_the_end_it_reaches() {
+        // (no anchor and no item under the keyboard: the edge the move comes from is the side it stops on)
+        assert_eq!(selected(0, 0, 20), ((0..=0).collect(), 0));
+        assert_eq!(selected(19, 19, 20), ((19..=19).collect(), 19));
+        // one item in the list
+        assert_eq!(selected(0, 0, 1), ((0..=0).collect(), 0));
+        // nothing to select at all
+        assert_eq!(selected(0, 0, 0), (vec![], 0));
+    }
+
+    #[test]
+    fn a_range_given_either_way_round_is_the_same_selection() {
+        assert_eq!(extend_range(2, 6), extend_range(6, 2));
+        assert_eq!(extend_range(2, 6).collect::<Vec<_>>(), vec![2, 3, 4, 5, 6]);
+        assert_eq!(extend_range(3, 3).collect::<Vec<_>>(), vec![3]);
+    }
+
+    #[test]
+    fn shift_page_down_and_shift_page_up_take_a_page_of_items() {
+        use super::PAGE_STEP;
+        // (a page is what PageUp / PageDown move without Shift: 20 items)
+        assert_eq!(PAGE_STEP, 20);
+        assert_eq!(selected(5, 5 + PAGE_STEP as usize, 100), ((5..=25).collect(), 25), "the anchor and a page down, 21 items");
+        assert_eq!(selected(50, 50 - PAGE_STEP as usize, 100), ((30..=50).collect(), 30));
+        // near the end it stops at the last item rather than past it
+        assert_eq!(selected(95, 99, 100), ((95..100).collect(), 99));
     }
 }
 
