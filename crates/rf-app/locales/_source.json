@@ -5723,6 +5723,27 @@
   "note": "where the % sign goes in this language"
  },
  {
+  "id": "abbae389",
+  "key": "@ago_minute",
+  "tr": "{n} dakika önce",
+  "en": "{n} min ago",
+  "note": "a relative time, the number in it: where {n} goes in this language"
+ },
+ {
+  "id": "a5e76f2f",
+  "key": "@ago_hour",
+  "tr": "{n} saat önce",
+  "en": "{n} h ago",
+  "note": "a relative time, the number in it: where {n} goes in this language"
+ },
+ {
+  "id": "4f52ae9d",
+  "key": "@ago_day",
+  "tr": "{n} gün önce",
+  "en": "{n} d ago",
+  "note": "a relative time, the number in it: where {n} goes in this language"
+ },
+ {
   "id": "5d57c6f0",
   "key": "Klasörlerde disk üzerindeki boyutu göster",
   "tr": "Klasörlerde disk üzerindeki boyutu göster",

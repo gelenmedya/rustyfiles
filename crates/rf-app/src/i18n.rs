@@ -226,11 +226,35 @@ pub fn set(lang: Lang) {
     #[cfg(not(test))]
     ACTIVE.store(code, Ordering::Relaxed);
     rf_core::format::set_english(l != Lang::Tr);
+    rf_core::format::set_relative_words(relative_words);
     // (the size names of the language, where it has its own: issue 283, "МБ instead of MB" in Russian)
     rf_core::format::set_units(match l {
         Lang::Other(_) => rf_core::format::units_for(l.code()),
         _ => None,
     });
+}
+
+/// The words of the relative times ("5 minutes ago") in the active language, for `rf-core` (which has no table of its own).
+///
+/// "Just now" is the Start panel's own text. The three counted ones are templates ("{n} min ago", "vor {n} Min.", "3 分钟前"),
+/// because the place of the number differs: Turkish puts it first ("5 dakika önce"), German and Chinese do not. A language
+/// that has not translated them falls back to English, as every other missing text does.
+fn relative_words(kind: rf_core::format::Relative) -> &'static str {
+    use rf_core::format::Relative;
+    match kind {
+        Relative::Now => t("Az önce"),
+        Relative::Minute => ago_template("@ago_minute", "{n} dakika önce", "{n} min ago"),
+        Relative::Hour => ago_template("@ago_hour", "{n} saat önce", "{n} h ago"),
+        Relative::Day => ago_template("@ago_day", "{n} gün önce", "{n} d ago"),
+    }
+}
+
+/// A relative time's template: the language's own ("@ago_minute"), else Turkish or English.
+fn ago_template(key: &str, tr: &'static str, en: &'static str) -> &'static str {
+    if is_tr() {
+        return tr;
+    }
+    template(key).unwrap_or(en)
 }
 
 /// The active (resolved) language.
@@ -499,6 +523,13 @@ mod tests {
         assert_eq!(coded("Listeleme hatası (kod )"), None);
         assert_eq!(td("kullanıcı dosyası.txt"), "kullanıcı dosyası.txt");
         assert_eq!(rf_core::format::size(1536), "1.50 KB");
+        // the relative times of the file list follow the UI language, not just "Turkish or not"
+        assert_eq!(relative_words(rf_core::format::Relative::Now), "Just now");
+        assert_eq!(
+            relative_words(rf_core::format::Relative::Minute),
+            "{n} min ago"
+        );
+        assert_eq!(relative_words(rf_core::format::Relative::Day), "{n} d ago");
         // every locale file: readable, and a missing text falls back to English
         for i in 0..LOCALES.len() as u16 {
             set(Lang::Other(i));
@@ -508,11 +539,41 @@ mod tests {
             // issue 381: a shown name leads to its English one (the settings search)
             let shown = t("Yeni klasör");
             assert!(shown == "New folder" || english_of(shown) == Some("New folder"), "{}: {shown}", LOCALES[i as usize].0);
+            // every locale has the three counted relative times, and the number is in them
+            for kind in [
+                rf_core::format::Relative::Minute,
+                rf_core::format::Relative::Hour,
+                rf_core::format::Relative::Day,
+            ] {
+                let words = relative_words(kind);
+                assert!(
+                    words.contains("{n}"),
+                    "{}: {words:?} has no number",
+                    LOCALES[i as usize].0
+                );
+            }
+        }
+        if let Some(i) = LOCALES.iter().position(|l| l.0 == "zh-Hans") {
+            set(Lang::Other(i as u16));
+            assert_eq!(
+                relative_words(rf_core::format::Relative::Minute),
+                "{n} 分钟前"
+            );
+            assert_eq!(
+                relative_words(rf_core::format::Relative::Hour),
+                "{n} 小时前"
+            );
+            assert_eq!(relative_words(rf_core::format::Relative::Day), "{n} 天前");
         }
         set(Lang::Tr);
         assert_eq!(td("Listeleme hatası (kod 87)"), "Listeleme hatası (kod 87)", "Turkish is the text itself");
         assert_eq!(english_of("Yeni klasör"), Some("New folder"));
         assert_eq!(english_of("bambaşka bir metin"), None);
         assert_eq!(rf_core::format::size(1536), "1,50 KB");
+        assert_eq!(relative_words(rf_core::format::Relative::Now), "Az önce");
+        assert_eq!(
+            relative_words(rf_core::format::Relative::Minute),
+            "{n} dakika önce"
+        );
     }
 }

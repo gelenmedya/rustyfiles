@@ -390,7 +390,7 @@ fn img_element(img: Arc<RenderImage>) -> impl IntoElement {
 
 use gpui_kit::prelude::FluentBuilder as _;
 
-/// Date only ("05.11.2026"), from the full local date-time.
+/// Date only ("05.11.2026"), in the system's own short date.
 fn day(ms: i64) -> String {
-    format::datetime_full(ms).split(' ').next().unwrap_or_default().to_string()
+    format::date(ms)
 }

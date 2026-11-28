@@ -9,6 +9,9 @@ static DATE_STYLE: AtomicU8 = AtomicU8::new(0);
 /// How the system writes a local date and time (Windows' short date and time, set by the app at start: `set_system_format`).
 /// Unset (tests, other platforms): "05.11.2026 13:45".
 static SYSTEM_FORMAT: std::sync::OnceLock<fn(&chrono::DateTime<Local>) -> Option<String>> = std::sync::OnceLock::new();
+/// The same for the date alone ("17.11.2026"), for the places that show a day and no time: `set_system_date`.
+/// Unset (tests, other platforms): "05.11.2026".
+static SYSTEM_DATE: std::sync::OnceLock<fn(&chrono::DateTime<Local>) -> Option<String>> = std::sync::OnceLock::new();
 
 /// Gives the date code the system's own way of writing a local date and time (issue 59: "Format of the creation date or last
 /// modified date should adhere to the date/time format settings defined by the OS"). Set once.
@@ -16,9 +19,19 @@ pub fn set_system_format(f: fn(&chrono::DateTime<Local>) -> Option<String>) {
     let _ = SYSTEM_FORMAT.set(f);
 }
 
+/// Gives the date code the system's own way of writing a date with no time. Set once, beside `set_system_format`.
+pub fn set_system_date(f: fn(&chrono::DateTime<Local>) -> Option<String>) {
+    let _ = SYSTEM_DATE.set(f);
+}
+
 /// A local date and time as the system writes it, else "05.11.2026 13:45".
 fn local(dt: &chrono::DateTime<Local>) -> String {
     SYSTEM_FORMAT.get().and_then(|f| f(dt)).unwrap_or_else(|| dt.format("%d.%m.%Y %H:%M").to_string())
+}
+
+/// A local date as the system writes it, else "05.11.2026".
+fn local_date(dt: &chrono::DateTime<Local>) -> String {
+    SYSTEM_DATE.get().and_then(|f| f(dt)).unwrap_or_else(|| dt.format("%d.%m.%Y").to_string())
 }
 
 /// How dates are shown (Settings → General → Date format).
@@ -90,7 +103,70 @@ pub fn units_for(code: &str) -> Option<Units> {
         "sr-Cyrl" => "бајтова",
         _ => return None,
     };
-    Some(Units { bytes, units: CYR, iec: CYR_IEC, mark: ',' })
+    Some(Units {
+        bytes,
+        units: CYR,
+        iec: CYR_IEC,
+        mark: ',',
+    })
+}
+
+/// The words of the relative times ("5 minutes ago"), in the UI language.
+///
+/// This crate has no translation table of its own (the texts live in `rf-app`), so the app hands the words over instead of a
+/// flag: `set_english` alone made every language but Turkish say "3 h ago". The function is asked for a template ("{n} min ago",
+/// "vor {n} Min.", "3 分钟前") and puts the number in where `{n}` stands.
+pub type RelativeWords = fn(Relative) -> &'static str;
+
+static RELATIVE_WORDS: std::sync::OnceLock<RelativeWords> = std::sync::OnceLock::new();
+
+/// Gives the relative times their words. Set once (a second call changes nothing).
+pub fn set_relative_words(f: RelativeWords) {
+    let _ = RELATIVE_WORDS.set(f);
+}
+
+/// A span of the relative times: what a "… ago" text counts.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Relative {
+    /// "just now"
+    Now,
+    /// "5 minutes ago"
+    Minute,
+    /// "3 hours ago"
+    Hour,
+    /// "2 days ago"
+    Day,
+}
+
+/// The words for a language nothing was handed over for: English, or Turkish when `set_english` was not called.
+fn english_relative(kind: Relative) -> &'static str {
+    match kind {
+        Relative::Now => "just now",
+        Relative::Minute => "{n} min ago",
+        Relative::Hour => "{n} h ago",
+        Relative::Day => "{n} d ago",
+    }
+}
+
+/// Turkish, for the tests and the places that run before the app hands its words over.
+fn turkish_relative(kind: Relative) -> &'static str {
+    match kind {
+        Relative::Now => "az önce",
+        Relative::Minute => "{n} dakika önce",
+        Relative::Hour => "{n} saat önce",
+        Relative::Day => "{n} gün önce",
+    }
+}
+
+/// A relative time with its number: "5 min ago", "az önce". The words come from [`set_relative_words`]; without it, English or
+/// Turkish by `en` (the flag `set_english` sets).
+fn relative(kind: Relative, n: i64, en: bool) -> String {
+    let template = match RELATIVE_WORDS.get() {
+        Some(f) => f(kind),
+        None if en => english_relative(kind),
+        None => turkish_relative(kind),
+    };
+    template.replace("{n}", &n.to_string())
 }
 
 /// "0 bayt", "512 bayt", "1,2 KB", "34,5 MB", "1,02 GB" (Turkish decimal comma).
@@ -168,6 +244,15 @@ pub fn datetime_full(ms: i64) -> String {
     datetime_with(ms, DateStyle::Local, 0, false)
 }
 
+/// The date alone, "05.11.2026", in the system's own short date: a day heading, a "last modified on" line.
+pub fn date(ms: i64) -> String {
+    if ms <= 0 {
+        return String::new();
+    }
+    let chrono::LocalResult::Single(dt) = Local.timestamp_millis_opt(ms) else { return String::new() };
+    local_date(&dt)
+}
+
 fn datetime_with(ms: i64, style: DateStyle, now: i64, en: bool) -> String {
     if ms <= 0 {
         return String::new();
@@ -178,15 +263,15 @@ fn datetime_with(ms: i64, style: DateStyle, now: i64, en: bool) -> String {
         DateStyle::Local => local(&dt),
         DateStyle::Relative => {
             let secs = (now - ms) / 1000;
-            let (n, tr, enu) = match secs {
+            let (kind, n) = match secs {
                 s if s < 0 => return local(&dt),
-                s if s < 45 => return (if en { "just now" } else { "az önce" }).to_string(),
-                s if s < 3600 => (((s + 30) / 60).max(1), "dakika önce", "min ago"),
-                s if s < 86_400 => (s / 3600, "saat önce", "h ago"),
-                s if s < 7 * 86_400 => (s / 86_400, "gün önce", "d ago"),
+                s if s < 45 => return relative(Relative::Now, 0, en),
+                s if s < 3600 => (Relative::Minute, ((s + 30) / 60).max(1)),
+                s if s < 86_400 => (Relative::Hour, s / 3600),
+                s if s < 7 * 86_400 => (Relative::Day, s / 86_400),
                 _ => return local(&dt),
             };
-            if en { format!("{n} {enu}") } else { format!("{n} {tr}") }
+            relative(kind, n, en)
         }
     }
 }
@@ -216,12 +301,30 @@ mod tests {
     #[test]
     fn relative_and_formats() {
         let now = 1_800_000_000_000i64;
+        // nothing handed over yet: the words follow the `en` flag, as they did before `set_relative_words`
         assert_eq!(datetime_with(now - 10_000, DateStyle::Relative, now, false), "az önce");
         assert_eq!(datetime_with(now - 5 * 60_000, DateStyle::Relative, now, false), "5 dakika önce");
         assert_eq!(datetime_with(now - 3 * 3_600_000, DateStyle::Relative, now, true), "3 h ago");
         assert_eq!(datetime_with(now - 2 * 86_400_000, DateStyle::Relative, now, false), "2 gün önce");
         assert!(datetime_with(now - 30 * 86_400_000, DateStyle::Relative, now, false).contains('.'));
         assert_eq!(datetime_with(now, DateStyle::Universal, now, false).len(), 16);
+        // and once the UI language hands its words over, they are the ones every relative time says, whatever `en` holds.
+        // (one value for the whole process, so the fallback above is asked for first, in this same test)
+        fn german(kind: Relative) -> &'static str {
+            match kind {
+                Relative::Now => "gerade eben",
+                Relative::Minute => "vor {n} Min.",
+                Relative::Hour => "vor {n} Std.",
+                Relative::Day => "vor {n} Tagen",
+            }
+        }
+        set_relative_words(german);
+        for en in [false, true] {
+            assert_eq!(datetime_with(now - 10_000, DateStyle::Relative, now, en), "gerade eben");
+            assert_eq!(datetime_with(now - 5 * 60_000, DateStyle::Relative, now, en), "vor 5 Min.");
+            assert_eq!(datetime_with(now - 3 * 3_600_000, DateStyle::Relative, now, en), "vor 3 Std.");
+            assert_eq!(datetime_with(now - 2 * 86_400_000, DateStyle::Relative, now, en), "vor 2 Tagen");
+        }
         assert_eq!(size_with(1500, false, true, false), "1,50 KB");
         assert_eq!(size_with(1500, false, false, false), "1,46 KB");
         assert_eq!(size_with(1500, true, false, true), "1.46 KiB");
@@ -234,5 +337,17 @@ mod tests {
         // 2000-01-01T00:00:00Z
         assert_eq!(filetime_to_unix_ms(125_911_584_000_000_000), 946_684_800_000);
         assert_eq!(filetime_to_unix_ms(0), 0);
+    }
+
+    /// The date alone is the system's own short date, with no time after it.
+    #[test]
+    fn a_date_has_no_time() {
+        let ms = 1_800_000_000_000i64;
+        let day = date(ms);
+        assert!(!day.is_empty());
+        assert!(!day.contains(':'), "no time: {day}");
+        assert!(day.contains("2027") || day.contains("27"), "the year is there: {day}");
+        assert_eq!(date(0), "");
+        assert_eq!(date(-1), "");
     }
 }

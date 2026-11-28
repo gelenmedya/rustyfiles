@@ -2233,5 +2233,8 @@
  "976b42f8": "Dodaj separator",
  "4cc75906": "Domyślna kolejność",
  "4e935827": "Ikony Windows",
- "a2e62d37": "Ikony Eksploratora plików Windows na pasku narzędzi"
+ "a2e62d37": "Ikony Eksploratora plików Windows na pasku narzędzi",
+ "abbae389": "{n} min temu",
+ "a5e76f2f": "{n} godz. temu",
+ "4f52ae9d": "{n} dni temu"
 }

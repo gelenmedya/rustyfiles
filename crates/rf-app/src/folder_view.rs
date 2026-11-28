@@ -188,7 +188,8 @@ fn calendar_key(g: GroupBy, ms: i64) -> (u32, String) {
     match g {
         GroupBy::Year => (10_000 - y, y.to_string()),
         GroupBy::Month => ((10_000 - y) * 12 + (12 - m), format!("{} {y}", crate::i18n::t(MONTHS[(m as usize - 1).min(11)]))),
-        _ => ((10_000 - y) * 372 + (12 - m) * 31 + (31 - d), format::datetime_full(ms).split(' ').next().unwrap_or_default().to_string()),
+        // (the day alone, in the system's own short date: a split on the space of the full date-time would cut "17 Nov 2026" to "17")
+        _ => ((10_000 - y) * 372 + (12 - m) * 31 + (31 - d), format::date(ms)),
     }
 }
 

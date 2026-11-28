@@ -2233,5 +2233,8 @@
  "976b42f8": "Trennlinie hinzufügen",
  "4cc75906": "Standardreihenfolge",
  "4e935827": "Windows-Symbole",
- "a2e62d37": "Die Symbole des Windows-Explorers in der Symbolleiste"
+ "a2e62d37": "Die Symbole des Windows-Explorers in der Symbolleiste",
+ "abbae389": "vor {n} Min.",
+ "a5e76f2f": "vor {n} Std.",
+ "4f52ae9d": "vor {n} Tagen"
 }
