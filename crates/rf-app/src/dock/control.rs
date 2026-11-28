@@ -160,6 +160,8 @@ pub struct Keys {
     /// its apps when it reads the file.
     pub all_monitors: bool,
     pub apps_where: crate::settings::DockAppsWhere,
+    /// The middle island's places, ignored apps and line between pinned and running apps: the island is built again when they change.
+    pub middle_shape: (bool, bool, String),
     /// Which of the dock's five parts run (`parts::run_flags`), in this order: desktop cover, hiding Windows' taskbar, the Windows key,
     /// Alt+Tab, the tray host. The dock starts or stops each of them when it reads the file, so the reload must not wait for its 5 s
     /// look at the file's date. These are the RESULT of the one switch and each part's own value, so the one switch moves all five.
@@ -194,6 +196,7 @@ impl Keys {
             size: s.dock_size,
             all_monitors: s.dock_all_monitors,
             apps_where: s.dock_apps_where,
+            middle_shape: (s.dock_hide_places, s.dock_running_divider, s.dock_ignored_apps.clone()),
             shell: super::parts::run_flags(s),
         }
     }
@@ -366,7 +369,7 @@ mod tests {
     }
 
     fn keys(reserve: bool, city: &str) -> Keys {
-        Keys { reserve, city: city.into(), weather_location: false, look: [52, 50, 67, 62], magnify: crate::settings::DockMagnify::Full, animations: crate::settings::AnimPref::System, own_start: true, own_control_centre: true, own_calendar: true, own_notifications: true, status: Default::default(), side_tall: false, tray_compact: false, tray_two_rows: false, show_desktop: false, labels: false, pins_left: false, hover_previews: true, app_menu: true, thin_when_maximized: true, start_recommended: true, start_grow: true, size: Default::default(), all_monitors: true, apps_where: crate::settings::DockAppsWhere::All, shell: [false; 5] }
+        Keys { reserve, city: city.into(), weather_location: false, look: [52, 50, 67, 62], magnify: crate::settings::DockMagnify::Full, animations: crate::settings::AnimPref::System, own_start: true, own_control_centre: true, own_calendar: true, own_notifications: true, status: Default::default(), side_tall: false, tray_compact: false, tray_two_rows: false, show_desktop: false, labels: false, pins_left: false, hover_previews: true, app_menu: true, thin_when_maximized: true, start_recommended: true, start_grow: true, size: Default::default(), all_monitors: true, apps_where: crate::settings::DockAppsWhere::All, middle_shape: (false, false, String::new()), shell: [false; 5] }
     }
 
     #[test]

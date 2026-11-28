@@ -310,6 +310,51 @@ pub fn merge(pins: &[PinnedApp], groups: Vec<(String, Vec<Task>)>, foreground: i
     items
 }
 
+/// The middle island's items as the user wants them (a Discord request, 2026-11-28): the Recycle Bin and Downloads left out
+/// (`hide_places`), the apps named in `ignored` left out ("chrome.exe, Spotify": a program's file name or the app's name, any case,
+/// separated by commas or semicolons), and a line between the pinned apps and the running ones that are not pinned (`divider`). Pure.
+pub fn shape(items: Vec<DockItem>, hide_places: bool, ignored: &str, divider: bool) -> Vec<DockItem> {
+    let ignored: Vec<String> = ignored.split([',', ';']).map(|s| s.trim().to_lowercase()).filter(|s| !s.is_empty()).collect();
+    let is_ignored = |a: &DockApp| {
+        let file = match &a.launch {
+            Some(Launch::Exe { path, .. }) => path.file_name().map(|n| n.to_string_lossy().to_lowercase()),
+            Some(Launch::Link(path)) => path.file_stem().map(|n| n.to_string_lossy().to_lowercase()),
+            _ => None,
+        };
+        let name = a.name.to_lowercase();
+        ignored.iter().any(|i| {
+            *i == name
+                || file.as_deref().is_some_and(|f| f == i || f.strip_suffix(".exe") == Some(i.as_str()))
+                || a.key.ends_with(&format!("\\{i}"))
+                || a.key.ends_with(&format!("\\{i}.exe"))
+        })
+    };
+    let mut out: Vec<DockItem> = items
+        .into_iter()
+        .filter(|i| match i {
+            DockItem::Place(_) => !hide_places,
+            DockItem::App(a) => !is_ignored(a),
+            DockItem::Separator => true,
+        })
+        .collect();
+    if hide_places {
+        // (the line before the places separates nothing now)
+        while matches!(out.last(), Some(DockItem::Separator)) {
+            out.pop();
+        }
+    }
+    if divider {
+        let last_pinned = out.iter().rposition(|i| matches!(i, DockItem::App(a) if a.pinned));
+        let first_running = out.iter().position(|i| matches!(i, DockItem::App(a) if !a.pinned));
+        if let (Some(lp), Some(fr)) = (last_pinned, first_running)
+            && fr == lp + 1
+        {
+            out.insert(fr, DockItem::Separator);
+        }
+    }
+    out
+}
+
 /// The separator stands between the apps and the places: with no app before it, it separates nothing and goes (issue 160).
 pub fn drop_lone_separator(items: &mut Vec<DockItem>) {
     if !items.iter().any(|i| matches!(i, DockItem::App(_))) {
@@ -339,6 +384,44 @@ pub fn keep_order(seen: &mut Vec<String>, groups: Vec<(String, Vec<Task>)>) -> V
 /// The `hover` slots of an item list: one per item, icons for apps and places, a separator for the line.
 pub fn slots(items: &[DockItem]) -> Vec<super::hover::Slot> {
     items.iter().map(|i| if matches!(i, DockItem::Separator) { super::hover::Slot::Separator } else { super::hover::Slot::Icon }).collect()
+}
+
+#[cfg(test)]
+mod shape_tests {
+    use super::*;
+
+    fn app(name: &str, exe: &str, pinned: bool) -> DockItem {
+        DockItem::App(DockApp {
+            key: format!("c:\\apps\\{exe}"),
+            name: name.into(),
+            pinned,
+            launch: Some(Launch::Exe { path: PathBuf::from(format!("C:\\Apps\\{exe}")), args: String::new() }),
+            icon: IconSource::Window(0),
+            windows: Vec::new(),
+            active: false,
+        })
+    }
+
+    fn names(items: &[DockItem]) -> Vec<String> {
+        items
+            .iter()
+            .map(|i| match i {
+                DockItem::App(a) => a.name.clone(),
+                DockItem::Separator => "|".into(),
+                DockItem::Place(p) => format!("{p:?}"),
+            })
+            .collect()
+    }
+
+    #[test]
+    fn the_middle_island_follows_the_users_choices() {
+        let items = || vec![app("Code", "code.exe", true), app("Chrome", "chrome.exe", false), app("Spotify", "spotify.exe", false), DockItem::Separator, DockItem::Place(Place::RecycleBin), DockItem::Place(Place::Downloads)];
+        assert_eq!(names(&shape(items(), false, "", false)), names(&items()), "nothing asked: as it was");
+        assert_eq!(names(&shape(items(), true, "", false)), ["Code", "Chrome", "Spotify"], "no places, and no line before them");
+        assert_eq!(names(&shape(items(), false, "chrome.exe; SPOTIFY", false)), ["Code", "|", "RecycleBin", "Downloads"], "by file name or by name");
+        assert_eq!(names(&shape(items(), true, "chrome", true)), ["Code", "|", "Spotify"], "a line between the pinned and the running");
+        assert_eq!(names(&shape(items(), true, "spotify, chrome", true)), ["Code"], "no running app left: no line");
+    }
 }
 
 #[cfg(test)]

@@ -172,6 +172,8 @@ pub struct MiddleIsland {
     /// The task list as the last refresh saw it, with the window in front: what the island is rebuilt from at once when a drop changes
     /// the order.
     last_groups: Vec<(String, Vec<Task>)>,
+    /// The Settings › Dock choices the items were last shaped with (see `model::shape`).
+    last_shape: Option<(bool, bool, String)>,
     last_foreground: isize,
     /// The item a button went down on and where (window units): it becomes a drag when the pointer moves sideways far enough.
     press_at: Option<(usize, f32, f32)>,
@@ -265,6 +267,7 @@ impl MiddleIsland {
             feedback: feedback::Feedback::default(),
             feel_keys: Vec::new(),
             last_groups: Vec::new(),
+            last_shape: None,
             last_foreground: 0,
             press_at: None,
             drag: None,
@@ -278,6 +281,16 @@ impl MiddleIsland {
         };
         // (the app menu tells it when the dock's own pin list changed)
         super::own_pins::register(cx.entity().downgrade(), cx);
+        // the island's shape follows Settings › Dock (places, ignored apps, the line) at once, not at the next change of the windows
+        cx.observe_global::<Settings>(|me: &mut Self, cx| {
+            let shape = cx.try_global::<Settings>().map(|s| (s.dock_hide_places, s.dock_running_divider, s.dock_ignored_apps.clone()));
+            if shape != me.last_shape {
+                me.last_shape = shape;
+                let (groups, foreground) = (me.last_groups.clone(), me.last_foreground);
+                me.apply(groups, foreground, cx);
+            }
+        })
+        .detach();
         // until the first refresh is done the dock shows what it always has: the two places
         me.items = model::merge(&[], Vec::new(), 0);
         me.feel_keys = feel_keys(&me.items);
@@ -346,6 +359,10 @@ impl MiddleIsland {
         // (the task list comes in Z order; the island's order must not follow the clicks)
         let groups = model::keep_order(&mut self.seen_order, groups);
         let mut items = model::merge(&self.pins, groups, foreground);
+        // what the user left out of the island or wants a line in (Settings › Dock)
+        if let Some(s) = cx.try_global::<Settings>() {
+            items = model::shape(items, s.dock_hide_places, &s.dock_ignored_apps, s.dock_running_divider);
+        }
         // the pinned apps that are not running go to the left island when the setting says so (the home dock's only)
         let left = if self.mon.is_home() && cx.try_global::<Settings>().is_some_and(|s| s.dock_pins_left) { take_idle_pins(&mut items) } else { Vec::new() };
         model::drop_lone_separator(&mut items);

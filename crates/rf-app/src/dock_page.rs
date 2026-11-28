@@ -413,6 +413,37 @@ pub(crate) fn entries() -> Vec<Entry> {
             Some(t!("Her ekranda hepsi: her dock sabitlenmiş uygulamaları ve çalışan tüm uygulamaları gösterir. Pencerenin olduğu ekranda: sabitlenmiş uygulamalar her dock'ta durur; sabitlenmemiş çalışan bir uygulama yalnızca penceresinin olduğu ekranın dock'unda görünür, sabitlenmiş bir uygulamanın çalışıyor işareti de yalnızca orada olur. Bir pencere başka ekrana taşınınca uygulaması, görev listesinin bir sonraki değişiminde onunla gider. Yalnızca birden çok ekranda ve \"Dock'u her ekranda göster\" açıkken bir şey değiştirir.")),
             Control::AppsWhere(|s| s.dock_apps_where, |s, v| s.dock_apps_where = v),
         ),
+        e(
+            "dock-hide-places",
+            "dock_hide_places",
+            Middle,
+            dock,
+            L::Trash,
+            t!("Geri Dönüşüm Kutusu ve İndirilenler'i gizle"),
+            Some(t!("Orta adanın sonundaki Geri Dönüşüm Kutusu ve İndirilenler simgeleri gösterilmez.")),
+            Control::Switch(|s| s.dock_hide_places, |s, v| s.dock_hide_places = v),
+        ),
+        e(
+            "dock-running-divider",
+            "dock_running_divider",
+            Middle,
+            dock,
+            L::Columns2,
+            t!("Sabitlenenlerle çalışanlar arasında ayırıcı"),
+            Some(t!("Sabitlenmiş uygulamalarla sabitlenmemiş çalışan uygulamalar arasına bir çizgi konur.")),
+            Control::Switch(|s| s.dock_running_divider, |s, v| s.dock_running_divider = v),
+        ),
+        e(
+            "dock-ignored-apps",
+            "dock_ignored_apps",
+            Middle,
+            dock,
+            L::EyeOff,
+            // (a text row shows no description: the example is in its title)
+            t!("Dock'ta gösterilmeyecek uygulamalar (örneğin chrome.exe, Spotify)"),
+            None,
+            Control::City(|s| s.dock_ignored_apps.as_str(), |s, v| s.dock_ignored_apps = v),
+        ),
         // ---- SAĞ ADA
         e(
             "dock-own-cc",
@@ -769,7 +800,7 @@ mod tests {
         let ids = |sec: Section| g.iter().find(|(s, _)| *s == sec).map(|(_, v)| v.iter().map(|e| e.field).collect::<Vec<_>>()).unwrap();
         assert_eq!(ids(Section::General), ["dock_enabled", "dock_reserve", "dock_size", "dock_side_tall", "dock_autohide", "dock_autohide_windows", "dock_opaque", "dock_adaptive_tone", "dock_performance", "dock_show_desktop", "dock_tray_compact", "dock_pins_left", "dock_labels", "dock_tray_two_rows", "dock_all_monitors", "dock_magnify", "dock_scroll_volume", "dock_start_grow"]);
         assert_eq!(ids(Section::Left), ["dock_own_start", "dock_start_recommended", "dock_search", "dock_search_hypersearch", "dock_weather_city"]);
-        assert_eq!(ids(Section::Middle), ["dock_hover_previews", "dock_app_menu", "dock_thin_when_maximized", "dock_apps_where"]);
+        assert_eq!(ids(Section::Middle), ["dock_hover_previews", "dock_app_menu", "dock_thin_when_maximized", "dock_apps_where", "dock_hide_places", "dock_running_divider", "dock_ignored_apps"]);
         assert_eq!(ids(Section::Right), ["dock_own_control_centre", "dock_own_calendar", "dock_own_notifications"]);
     }
 

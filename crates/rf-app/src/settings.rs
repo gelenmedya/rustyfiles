@@ -909,6 +909,13 @@ pub struct Settings {
     /// Pinned apps that are not running stand in the left island, as launchers; the middle one holds the running apps (off). Issue 137:
     /// "I would like to see apps pinned appearing on the left dock when they are not open".
     pub dock_pins_left: bool,
+    /// The middle island without the Recycle Bin and Downloads (off; a Discord request, 2026-11-28).
+    pub dock_hide_places: bool,
+    /// A line between the pinned apps and the running ones that are not pinned (off; the same request).
+    pub dock_running_divider: bool,
+    /// Apps never shown in the dock: program file names or app names, separated by commas (the same request).
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub dock_ignored_apps: String,
     /// The left island's search: a field, its button only, or none (`DockSearch`).
     pub dock_search: DockSearch,
     /// A click on the dock's search field or button opens HyperSearch instead of the Start panel (issue 41). Off by default.
@@ -1207,6 +1214,9 @@ impl Default for Settings {
             dock_show_desktop: false,
             dock_labels: false,
             dock_pins_left: false,
+            dock_hide_places: false,
+            dock_running_divider: false,
+            dock_ignored_apps: String::new(),
             dock_search: DockSearch::Field,
             dock_search_hypersearch: false,
             dock_tray_compact: false,
